@@ -1,19 +1,19 @@
 pipeline {
-    agent any #1
+    agent any
     stages {
-        stage('Build') { #2
+        stage('Build') {
            steps {
                 // #3
             }
         }
 
-        stage('Test') { #4
+        stage('Test') {
             steps {
                 // #5
             }
         }
 
-        stage('Deploy') { #6
+        stage('Deploy') { 
             steps {
                 // #7
             }
