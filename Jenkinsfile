@@ -37,7 +37,7 @@ pipeline {
                         ]
                     ]
 
-                    def response = jiraNewIssue issue: jiraIssue, site: env.JIRA_SITE, secret: JIRA_CREDENTIALS_ID
+                    def response = jiraNewIssue issue: jiraIssue, site: env.JIRA_SITE
                     echo "Created Jira issue: ${response.data.key}"
                 }
             }
