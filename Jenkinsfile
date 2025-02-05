@@ -29,59 +29,32 @@ pipeline {
             }
         }
 
-        stage('JIRA') {
-
-            def testIssue = [fields: [
-            project: [id: 'PROY-123'],
-            summary: 'New JIRA Created from Jenkins.',
-            description: 'New JIRA Created from Jenkins.',
-            customfield_1000: 'customValue',
-            // id or name must present for issuetype.
-            issuetype: [id: '1']]]
-
-            response = jiraEditIssue idOrKey: 'TEST-01', issue: testIssue
-
-            echo response.successful.toString()
-            echo response.data.toString()
-        }
-
-        stage('Report to Jira') {
+        stage('Create Jira Issue') {
             steps {
                 script {
-                    // Define the Jira issue payload
-                    def issuePayload = """
-                    {
-                        "fields": {
-                            "project": {
-                                "key": "PROY-123"
-                            },
-                            "summary": "Build and Test Report - ${env.BUILD_NUMBER}",
-                            "description": "Build and test results for build number ${env.BUILD_NUMBER}",
-                            "issuetype": {
-                                "name": "${env.JIRA_ISSUE_TYPE}"
-                            }
-                        }
-                    }
-                    """
+                    def jiraIssue = [
+                        fields: [
+                            project: [
+                                key: env.JIRA_ISSUE_KEY
+                            ],
+                            summary: "Build failed for ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                            description: "The build failed. Please check the Jenkins logs for more details.",
+                            issuetype: [
+                                name: env.JIRA_ISSUE_TYPE
+                            ]
+                        ]
+                    ]
 
-                    // Convert JIRA_CREDENTIALS_ID to a String and then encode it
-                    def credentials = env.JIRA_CREDENTIALS_ID.toString()
-                    def encodedCredentials = Base64.getEncoder().encodeToString(credentials.getBytes())
-
-                    // Create the Jira issue using the REST API
                     def response = httpRequest(
-                        url: "${env.JIRA_SITE}/rest/api/2/issue",
-                        httpMode: 'POST',
+                        acceptType: 'APPLICATION_JSON',
                         contentType: 'APPLICATION_JSON',
-                        customHeaders: [
-                            [name: 'Authorization', value: "Basic ${encodedCredentials}"]
-                        ],
-                        requestBody: issuePayload
+                        httpMode: 'POST',
+                        requestBody: groovy.json.JsonOutput.toJson(jiraIssue),
+                        url: "${env.JIRA_SITE}/rest/api/2/issue",
+                        authentication: 'jira-credentials'
                     )
 
-                    // Parse the response
-                    def responseJson = readJSON text: response.content
-                    echo "Created Jira issue: ${responseJson.key}"
+                    echo "Jira issue created: ${response}"
                 }
             }
         }
