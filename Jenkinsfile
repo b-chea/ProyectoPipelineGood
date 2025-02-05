@@ -6,7 +6,7 @@ pipeline {
         JIRA_ISSUE_KEY = 'PROY-123'
     }
     tools{
-        maven 'apache-maven-3.9.9'
+        maven '3.9.9'
 
     }
     stages {
