@@ -32,7 +32,8 @@ pipeline {
             steps {
                 script{
                     if (currentBuild.result == null || currentBuild.result == 'SUCCESS'){
-                        jiraTrasnsitionIssue issueKey: "${JIRA_ISSUE_KEY}", comment: "Build exitosa: ${env.BUILD_URL}"
+                        jiraTransitionIssue issueKey: "${JIRA_ISSUE_KEY}", comment: "Build exitosa: ${env.BUILD_URL}"
+                        jiraTransitionIssue
                     }
                 }
             }
