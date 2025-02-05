@@ -4,6 +4,7 @@ pipeline {
         JIRA_SITE = 'https://bethsaidach-1738694022756.atlassian.net'
         JIRA_CREDENTIALS_ID = 'jenkins-credentials'
         JIRA_ISSUE_KEY = 'PROY-123'
+        JIRA_ISSUE_TYPE = 'Bug'
     }
     tools {
         maven 'MAVEN_HOME'
@@ -27,16 +28,30 @@ pipeline {
                 sh 'mvn test'
             }
         }
-
-        stage('Actualizar Jira con Éxito') {
+        stage('Report to Jira') {
             steps {
-                script{
-                    if (currentBuild.result == null || currentBuild.result == 'SUCCESS'){
-                        jiraTransitionIssue issueKey: "${JIRA_ISSUE_KEY}", comment: "Build exitosa: ${env.BUILD_URL}"
-                    }
+                script {
+                    def jiraIssue = [
+                        fields: [
+                            project: [
+                                key: env.JIRA_ISSUE_KEY
+                            ],
+                            summary: "Build and Test Report - ${env.BUILD_NUMBER}",
+                            description: "Build and test results for build number ${env.BUILD_NUMBER}",
+                            issuetype: [
+                                name: env.JIRA_ISSUE_TYPE
+                            ]
+                        ]
+                    ]
+
+                    def response = jiraNewIssue issue: jiraIssue, site: env.JIRA_SITE
+                    echo "Created Jira issue: ${response.data.key}"
                 }
             }
         }
+
+
+
 
     }
     post{
