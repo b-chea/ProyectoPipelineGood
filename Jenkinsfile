@@ -8,12 +8,7 @@ pipeline {
     stages {
         stage('Actualiza JIRA') {
             steps {
-                withEnv(['JIRA_SITE=https://bethsaidach-1738694022756.atlassian.net']) {
-                    def comment = [ body: 'Build iniciada en Jenkins' ]
-                    jiraAddComment idOrKey: 'PROY-123', input: comment
-
-                }
-
+                jiraAddComment site: "{JIRA_SITE}", idOrKey: "{JIRA_ISSUE_KEY}", comment: 'test comment'
             }
         }
 
