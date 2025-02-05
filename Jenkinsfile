@@ -28,7 +28,7 @@ pipeline {
             }
         }
 
-        stage('Actualiza Jira con Éxito') {
+        stage('Actualizar Jira con Éxito') {
             steps {
                 script{
                     if (currentBuild.result == null || currentBuild.result == 'SUCCESS'){
