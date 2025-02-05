@@ -29,24 +29,41 @@ pipeline {
             }
         }
 
+
+
         stage('Report to Jira') {
             steps {
                 script {
-                    def jiraIssue = [
-                        fields: [
-                            project: [
-                                key: 'PROY-123'
-                            ],
-                            summary: "Build and Test Report - ${env.BUILD_NUMBER}",
-                            description: "Build and test results for build number ${env.BUILD_NUMBER}",
-                            issuetype: [
-                                name: env.JIRA_ISSUE_TYPE
-                            ]
-                        ]
-                    ]
+                    // Define the Jira issue payload
+                    def issuePayload = """
+                    {
+                        "fields": {
+                            "project": {
+                                "key": "PROY-123"
+                            },
+                            "summary": "Build and Test Report - ${env.BUILD_NUMBER}",
+                            "description": "Build and test results for build number ${env.BUILD_NUMBER}",
+                            "issuetype": {
+                                "name": "${env.JIRA_ISSUE_TYPE}"
+                            }
+                        }
+                    }
+                    """
 
-                    def response = jiraIssue issue: jiraIssue, site: env.JIRA_SITE, credentialsId: env.JIRA_CREDENTIALS_ID
-                    echo "Created Jira issue: ${response.data.key}"
+                    // Create the Jira issue using the REST API
+                    def response = httpRequest(
+                        url: "${env.JIRA_SITE}/rest/api/2/issue",
+                        httpMode: 'POST',
+                        contentType: 'APPLICATION_JSON',
+                        customHeaders: [
+                            [name: 'Authorization', value: "Basic ${Base64.getEncoder().encodeToString("${env.JIRA_CREDENTIALS_ID}".bytes)}"]
+                        ],
+                        requestBody: issuePayload
+                    )
+
+                    // Parse the response
+                    def responseJson = readJSON text: response.content
+                    echo "Created Jira issue: ${responseJson.key}"
                 }
             }
         }
