@@ -28,13 +28,14 @@ pipeline {
                 sh 'mvn test'
             }
         }
+
         stage('Report to Jira') {
             steps {
                 script {
                     def jiraIssue = [
                         fields: [
                             project: [
-                                key: env.JIRA_ISSUE_KEY
+                                key: '${JIRA_ISSUE_KEY}'
                             ],
                             summary: "Build and Test Report - ${env.BUILD_NUMBER}",
                             description: "Build and test results for build number ${env.BUILD_NUMBER}",
@@ -44,13 +45,11 @@ pipeline {
                         ]
                     ]
 
-                    def response = jiraNewIssue issue: jiraIssue, site: env.JIRA_SITE
+                    def response = jiraIssue issue: jiraIssue, site: env.JIRA_SITE, credentialsId: env.JIRA_CREDENTIALS_ID
                     echo "Created Jira issue: ${response.data.key}"
                 }
             }
         }
-
-
 
 
     }
