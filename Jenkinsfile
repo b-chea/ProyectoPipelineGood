@@ -29,8 +29,6 @@ pipeline {
             }
         }
 
-
-
         stage('Report to Jira') {
             steps {
                 script {
@@ -50,13 +48,17 @@ pipeline {
                     }
                     """
 
+                    // Convert JIRA_CREDENTIALS_ID to a String and then encode it
+                    def credentials = env.JIRA_CREDENTIALS_ID.toString()
+                    def encodedCredentials = Base64.getEncoder().encodeToString(credentials.getBytes())
+
                     // Create the Jira issue using the REST API
                     def response = httpRequest(
                         url: "${env.JIRA_SITE}/rest/api/2/issue",
                         httpMode: 'POST',
                         contentType: 'APPLICATION_JSON',
                         customHeaders: [
-                            [name: 'Authorization', value: "Basic ${Base64.getEncoder().encodeToString("${env.JIRA_CREDENTIALS_ID}".bytes)}"]
+                            [name: 'Authorization', value: "Basic ${encodedCredentials}"]
                         ],
                         requestBody: issuePayload
                     )
