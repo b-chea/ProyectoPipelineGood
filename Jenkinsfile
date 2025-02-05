@@ -35,7 +35,7 @@ pipeline {
         }
 
         post{
-            fauilure{
+            failure{
                 jiraAddComment issueKey: "${JIRA_ISSUE_KEY}", comment: "Build fallida en Jenkins: ${env.BUILD_URL}"
             }
         }
