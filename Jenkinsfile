@@ -29,6 +29,22 @@ pipeline {
             }
         }
 
+        stage('JIRA') {
+
+            def testIssue = [fields: [
+            project: [id: 'PROY-123'],
+            summary: 'New JIRA Created from Jenkins.',
+            description: 'New JIRA Created from Jenkins.',
+            customfield_1000: 'customValue',
+            // id or name must present for issuetype.
+            issuetype: [id: '1']]]
+
+            response = jiraEditIssue idOrKey: 'TEST-01', issue: testIssue
+
+            echo response.successful.toString()
+            echo response.data.toString()
+        }
+
         stage('Report to Jira') {
             steps {
                 script {
