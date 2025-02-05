@@ -7,7 +7,7 @@ pipeline {
     }
 
     stages {
-        stage('Actualiza JIRA') {
+        stage('Actualizar JIRA') {
             steps {
                 jiraComment issueKey: "${JIRA_ISSUE_KEY}", comment: "Build iniciada en Jenkins: ${env.BUILD_URL}"
             }
