@@ -8,7 +8,7 @@ pipeline {
     stages {
         stage('Actualiza JIRA') {
             steps {
-                jiraAddComment site: "{JIRA_SITE}", idOrKey: "{JIRA_ISSUE_KEY}", comment: 'test comment'
+                jiraComment issueKey: "${JIRA_ISSUE_KEY}", comment: "Build iniciada en Jenkins: ${env.BUILD_URL}"
             }
         }
 
@@ -37,7 +37,8 @@ pipeline {
     }
     post{
         failure{
-            jiraAddComment issueKey: "${JIRA_ISSUE_KEY}", comment: "Build fallida en Jenkins: ${env.BUILD_URL}"
+            jiraComment issueKey: "${JIRA_ISSUE_KEY}", comment: "Build fallida en Jenkins: ${env.BUILD_URL}"
         }
     }
 }
+
