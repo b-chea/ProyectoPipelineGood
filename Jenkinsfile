@@ -26,8 +26,10 @@ pipeline {
 
         stage('Actualiza Jira con Éxito') {
             steps {
-                if (currentBuild.result == null || currentBuild.result == 'SUCCESS'){
-                    jiraTrsnsitionIssue issueKey: "${JIRA_ISSUE_KEY}", comment: "Build exitosa: ${env.BUILD_URL}"
+                script{
+                    if (currentBuild.result == null || currentBuild.result == 'SUCCESS'){
+                        jiraTrsnsitionIssue issueKey: "${JIRA_ISSUE_KEY}", comment: "Build exitosa: ${env.BUILD_URL}"
+                    }
                 }
             }
         }
