@@ -51,7 +51,7 @@ pipeline {
                         httpMode: 'POST',
                         requestBody: groovy.json.JsonOutput.toJson(jiraIssue),
                         url: "${env.JIRA_SITE}/rest/api/2/issue",
-                        authentication: 'jira-credentials'
+                        authentication: '${JIRA_CREDENTIALS_ID}'
                     )
 
                     echo "Jira issue created: ${response}"
