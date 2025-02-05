@@ -5,7 +5,10 @@ pipeline {
         JIRA_CREDENTIALS_ID = 'jenkins-credentials'
         JIRA_ISSUE_KEY = 'PROY-123'
     }
-
+    tools {
+        maven 'MAVEN_HOME'
+        jdk 'JAVA_HOME'
+    }
     stages {
         stage('Actualizar JIRA') {
             steps {
