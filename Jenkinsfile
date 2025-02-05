@@ -35,7 +35,7 @@ pipeline {
                     def jiraIssue = [
                         fields: [
                             project: [
-                                key: '${JIRA_ISSUE_KEY}'
+                                key: 'PROY-123'
                             ],
                             summary: "Build and Test Report - ${env.BUILD_NUMBER}",
                             description: "Build and test results for build number ${env.BUILD_NUMBER}",
