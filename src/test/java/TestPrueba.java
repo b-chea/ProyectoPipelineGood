@@ -25,7 +25,7 @@ public class TestPrueba {
         driver.findElement(By.xpath("//textarea[@id='APjFqb']")).sendKeys("Cantidad de paises en América");
         driver.findElement(By.xpath("//textarea[@id='APjFqb']")).sendKeys(Keys.ENTER);
 
-        //driver.findElement(By.xpath("//h3[contains(text(),'Mapa Político de América: Países y Capitales - Web')]")).click();
+        driver.findElement(By.xpath("//h3[contains(text(),'Mapa Político de América: Países y Capitales - Web')]")).click();
         driver.quit();
     }
 }
