@@ -1,44 +1,53 @@
 pipeline {
     agent any
-    environment{
+
+    environment {
         JIRA_SITE = 'https://bethsaidach-1738694022756.atlassian.net'
+        JIRA_PROJECT_KEY = 'PROY-123'
+        JIRA_ISSUE_TYPE = 'Bug'
         JIRA_CREDENTIALS_ID = 'jenkins-credentials'
-        JIRA_ISSUE_KEY = 'PROY-123'
     }
+
     stages {
-        stage('Actualiza JIRA') {
-           steps {
-               jiraAddComment site: '{JIRA_SITE}', idOrKey: '{JIRA_ISSUE_KEY}', comment: 'test comment'
-
+        stage('Build') {
+            steps {
+                echo 'Building...'
+                // Aquí irían los pasos de construcción de tu proyecto
             }
         }
-
-        stage('Compilar proyecto') {
+        stage('Test') {
             steps {
-                sh 'mvn clean compile'
+                echo 'Testing...'
+                // Aquí irían los pasos de pruebas de tu proyecto
             }
         }
-
-        stage('Ejectutar Pruebas') {
+        stage('Report to Jira') {
             steps {
-                sh 'mvn test'
-            }
-        }
+                script {
+                    def jiraIssue = [
+                        fields: [
+                            project: [
+                                key: env.JIRA_PROJECT_KEY
+                            ],
+                            summary: "Build and Test Report - ${env.BUILD_NUMBER}",
+                            description: "Build and test results for build number ${env.BUILD_NUMBER}",
+                            issuetype: [
+                                name: env.JIRA_ISSUE_TYPE
+                            ]
+                        ]
+                    ]
 
-        stage('Actualiza Jira con Éxito') {
-            steps {
-                script{
-                    if (currentBuild.result == null || currentBuild.result == 'SUCCESS'){
-                        jiraTrsnsitionIssue issueKey: "${JIRA_ISSUE_KEY}", comment: "Build exitosa: ${env.BUILD_URL}"
-                    }
+                    def response = jiraNewIssue issue: jiraIssue, site: env.JIRA_SITE, secret: JIRA_CREDENTIALS_ID
+                    echo "Created Jira issue: ${response.data.key}"
                 }
             }
         }
-
     }
-    post{
-        failure{
-            jiraAddComment issueKey: "${JIRA_ISSUE_KEY}", comment: "Build fallida en Jenkins: ${env.BUILD_URL}"
+
+    post {
+        always {
+            echo 'Cleaning up...'
+            // Aquí irían los pasos de limpieza, si es necesario
         }
     }
 }
