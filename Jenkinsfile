@@ -52,11 +52,12 @@ pipeline {
                         contentType: 'APPLICATION_JSON',
                         httpMode: 'POST',
                         requestBody: groovy.json.JsonOutput.toJson(jiraIssue),
-                        url: "${env.JIRA_SITE}/jira/software/projects/PLPROJECT1/boards/1",
+                        url: "${env.JIRA_SITE}/rest/api/2/issue",
                         authentication: env.JIRA_CREDENTIALS_ID
                     )
 
                     echo "Jira issue created: ${response}"
+                    echo "Jira response: ${response.content}"
                 }
             }
         }
