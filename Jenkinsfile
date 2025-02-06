@@ -32,27 +32,7 @@ pipeline {
         stage('Create Jira Issue') {
             steps {
                 script {
-                    def jiraIssue = [
-                        fields: [
-                            project: [
-                                key: env.JIRA_ISSUE_KEY
-                            ],
-                            summary: "Build failed for ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-                            description: "The build failed. Please check the Jenkins logs for more details.",
-                            issuetype: [
-                                name: env.JIRA_ISSUE_TYPE
-                            ]
-                        ]
-                    ]
-
-                    def response = httpRequest(
-                        acceptType: 'APPLICATION_JSON',
-                        contentType: 'APPLICATION_JSON',
-                        httpMode: 'POST',
-                        requestBody: groovy.json.JsonOutput.toJson(jiraIssue),
-                        url: "${env.JIRA_SITE}/jira/software/projects/SCRUM/boards/1/backlog",
-                        authentication: env.JIRA_CREDENTIALS_ID
-                    )
+                    jiraIssueSelector(issueSelector: [$class: 'ExplicitIssueSelector', issueKeys: 'PROY-123'])
 
                     echo "Jira issue created: ${response}"
                 }
