@@ -11,7 +11,7 @@ public class TestPrueba {
     @Test
     public void hacer_una_busqueda(){
 
-        System.setProperty("webdriver.chrome.driver", "C:\\chromedriver-win64\\chromedriver-win64\\chromedriver.exe");
+        System.setProperty("webdriver.chrome.driver", "C:\\Users\\viamatica\\Documents\\Driver\\chromedriver-win64\\chromedriver-win64\\chromedriver.exe");
         WebDriver driver = new ChromeDriver();
 
         //Se define tiempo de espera
