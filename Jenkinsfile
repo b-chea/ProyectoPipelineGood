@@ -54,7 +54,7 @@ pipeline {
                         url: "${env.JIRA_SITE}/jira/software/projects/SCRUM/boards/1",
                         authentication: env.JIRA_CREDENTIALS_ID
                     )
-                    jiraAddComment comment: 'Build iniciada en Jenkins', idOrKey: 'PROY-123', site: 'bethsaidach-1738694022756.atlassian.net'
+
                     echo "Jira issue created: ${response}"
                 }
             }
