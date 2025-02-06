@@ -1,7 +1,7 @@
 pipeline {
     agent any
     environment{
-        JIRA_SITE = 'https://bethsaidach-1738694022756.atlassian.net'
+        JIRA_SITE = 'https://bethsaidach-1738694022756.atlassian.net/browse'
         JIRA_CREDENTIALS_ID = 'jenkins-credentials'
         JIRA_ISSUE_KEY = 'PROY-123'
         JIRA_ISSUE_TYPE = 'TASK'
@@ -14,7 +14,7 @@ pipeline {
         stage('Build') {
             steps {
                 echo "Building..."
-                //jiraAddComment comment: 'Build iniciada en Jenkins', idOrKey: 'PROY-123', site: 'bethsaidach-1738694022756.atlassian.net'
+                jiraAddComment comment: 'Build iniciada en Jenkins', idOrKey: 'SCRUM-1', site: 'bethsaidach-1738694022756.atlassian.net/browse'
             }
         }
 
