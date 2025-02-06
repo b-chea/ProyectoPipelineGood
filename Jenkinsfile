@@ -14,7 +14,7 @@ pipeline {
         stage('Build') {
             steps {
                 echo "Building..."
-                jiraComment body: 'Build iniciada en Jenkins', issueKey: 'PROY-123'
+                jiraComment body: 'Build iniciada en Jenkins', issueKey: '1'
             }
         }
 
