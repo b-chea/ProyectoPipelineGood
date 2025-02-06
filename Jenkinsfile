@@ -31,15 +31,24 @@ pipeline {
         }
 
         stage('JIRA') {
-            def testIssue = [fields: [ project: [key: 'RFC'],
-                summary: 'New JIRA Created from Jenkins.',
-                description: 'New JIRA Created from Jenkins.',
-                issuetype: [id: '10500']]]
+            steps {
+                script {
+                    def testIssue = [fields: [ project: [key: 'RFC'],
 
-            response = jiraNewIssue issue: testIssue, site: 'JIRA T'
+                        summary: 'New JIRA Created from Jenkins.',
+                        description: 'New JIRA Created from Jenkins.',
+                        issuetype: [id: '10500'
 
+                    ]]]
+
+                    response = jiraNewIssue issue:
+
+                    testIssue, site: 'JIRA T'
+                }
+            }
             echo response.successful.toString()
             echo response.data.toString()
+
         }
 
         stage('Create Jira Issue') {
