@@ -34,7 +34,7 @@ pipeline {
                 script {
                     jiraIssueSelector(issueSelector: [$class: 'ExplicitIssueSelector', issueKeys: 'PROY-123'])
 
-                    echo "Jira issue created: ${response}"
+
                 }
             }
         }
