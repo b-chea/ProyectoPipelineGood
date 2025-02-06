@@ -52,7 +52,7 @@ pipeline {
                         contentType: 'APPLICATION_JSON',
                         httpMode: 'POST',
                         requestBody: groovy.json.JsonOutput.toJson(jiraIssue),
-                        url: "${env.JIRA_SITE}/rest/api/2/issue",
+                        url: "${env.JIRA_SITE}/rest/api/4/issue",
                         authentication: env.JIRA_CREDENTIALS_ID
                     )
 
