@@ -4,7 +4,7 @@ pipeline {
         JIRA_SITE = 'https://bethsaidach-1738694022756.atlassian.net'
         JIRA_CREDENTIALS_ID = 'jenkins-credentials'
         JIRA_ISSUE_KEY = 'PROY-123'
-        JIRA_ISSUE_TYPE = 'Bug'
+        JIRA_ISSUE_TYPE = 'Error'
     }
     tools {
         maven 'MAVEN_HOME'
