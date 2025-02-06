@@ -11,9 +11,9 @@ pipeline {
         jdk 'JAVA_HOME'
     }
     stages {
-        stage('Fetch repository') {
+        stage('Build') {
             steps {
-                git 'https://github.com/b-chea/ProyectoPipelineGood.git'
+                echo "Building..."
             }
         }
 
@@ -59,6 +59,16 @@ pipeline {
             }
         }
 
+
+    }
+    post {
+
+        success {
+            echo 'Successfully!'
+        }
+        failure {
+            echo 'Failed!'
+        }
 
     }
 
