@@ -1,7 +1,7 @@
 pipeline {
     agent any
     environment{
-        JIRA_SITE = 'https://bethsaidach-1738694022756.atlassian.net/browse'
+        JIRA_SITE = 'https://bethsaidach-1738694022756.atlassian.net'
         JIRA_CREDENTIALS_ID = 'jenkins-credentials'
         JIRA_ISSUE_KEY = 'PROY-123'
         JIRA_ISSUE_TYPE = 'TASK'
@@ -14,7 +14,7 @@ pipeline {
         stage('Build') {
             steps {
                 echo "Building..."
-                jiraAddComment comment: 'Build iniciada en Jenkins', idOrKey: 'SCRUM-1', site: 'bethsaidach-1738694022756.atlassian.net/browse'
+                //jiraAddComment comment: 'Build iniciada en Jenkins', idOrKey: 'PROY-123', site: 'bethsaidach-1738694022756.atlassian.net'
             }
         }
 
@@ -51,7 +51,7 @@ pipeline {
                         contentType: 'APPLICATION_JSON',
                         httpMode: 'POST',
                         requestBody: groovy.json.JsonOutput.toJson(jiraIssue),
-                        url: "${env.JIRA_SITE}/jira/software/projects/SCRUM/boards/1/backlog",
+                        url: "${env.JIRA_SITE}/browse/SCRUM-1",
                         authentication: env.JIRA_CREDENTIALS_ID
                     )
 
