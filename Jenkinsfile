@@ -51,7 +51,7 @@ pipeline {
                         contentType: 'APPLICATION_JSON',
                         httpMode: 'POST',
                         requestBody: groovy.json.JsonOutput.toJson(jiraIssue),
-                        url: "${env.JIRA_SITE}/browse/PLPROJECT1-1",
+                        url: "${env.JIRA_SITE}/jira/software/projects/PLPROJECT1/boards/1",
                         authentication: env.JIRA_CREDENTIALS_ID
                     )
 
