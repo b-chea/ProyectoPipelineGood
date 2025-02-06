@@ -44,10 +44,11 @@ pipeline {
                     response = jiraNewIssue issue:
 
                     testIssue, site: 'JIRA T'
+                    echo response.successful.toString()
+                    echo response.data.toString()
                 }
             }
-            echo response.successful.toString()
-            echo response.data.toString()
+
 
         }
 
