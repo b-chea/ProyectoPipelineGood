@@ -11,9 +11,9 @@ pipeline {
         jdk 'JAVA_HOME'
     }
     stages {
-        stage('Actualizar JIRA') {
+        stage('Fetch repository') {
             steps {
-                jiraComment issueKey: "${JIRA_ISSUE_KEY}", comment: "Build iniciada en Jenkins: ${env.BUILD_URL}"
+                git 'https://github.com/b-chea/ProyectoPipelineGood.git'
             }
         }
 
