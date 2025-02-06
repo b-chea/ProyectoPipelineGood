@@ -50,7 +50,7 @@ pipeline {
                         contentType: 'APPLICATION_JSON',
                         httpMode: 'POST',
                         requestBody: groovy.json.JsonOutput.toJson(jiraIssue),
-                        url: "${env.JIRA_SITE}/jira/software/projects/SCRUM/boards/1/backlog?selectedIssue=SCRUM-1",
+                        url: "${env.JIRA_SITE}/jira/software/projects/SCRUM/boards/1/backlog",
                         authentication: env.JIRA_CREDENTIALS_ID
                     )
 
