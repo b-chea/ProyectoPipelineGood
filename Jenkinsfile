@@ -43,7 +43,7 @@ pipeline {
 
                     response = jiraNewIssue issue:
 
-                    testIssue, site: 'JIRA T'
+                    testIssue, site: 'https://bethsaidach-1738694022756.atlassian.net'
                     echo response.successful.toString()
                     echo response.data.toString()
                 }
