@@ -31,11 +31,8 @@ pipeline {
 
         stage('Create Jira Issue') {
             steps {
-                script {
                     jiraIssueSelector(issueSelector: [$class: 'ExplicitIssueSelector', issueKeys: 'PROY-123'])
 
-
-                }
             }
         }
 
