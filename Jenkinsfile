@@ -32,53 +32,24 @@ pipeline {
         }
 
 
-            stage('Create Jira Issue') {
-                steps {
-                    script {
-                        withCredentials([usernamePassword(credentialsId: 'jenkins-credentials', usernameVariable: 'JIRA_USER', passwordVariable: 'JIRA_AUTH_PSW')]) {
-                            def authHeader = "Basic " + "${JIRA_USER}:${JIRA_AUTH_PSW}".bytes.encodeBase64().toString()
+        stage('Create Jira Issue') {
+            steps {
+                script {
+                    withCredentials([usernamePassword(credentialsId: 'jenkins-credentials', usernameVariable: 'JIRA_USER', passwordVariable: 'JIRA_AUTH_PSW')]) {
+                        def authHeader = "Basic " + "${JIRA_USER}:${JIRA_AUTH_PSW}".bytes.encodeBase64().toString()
 
-                            def jsonPayload = '''
-                        {
-                            "fields": {
-                                "project": {
-                                    "key": "PLPROJECT1"
-                                },
-                                "summary": "Prueba desde Jenkins",
-                                "description": {
-                                    "type": "doc",
-                                    "version": 1,
-                                    "content": [
-                                        {
-                                            "type": "paragraph",
-                                            "content": [
-                                                {
-                                                    "type": "text",
-                                                    "text": "Creando un issue desde Jenkins"
-                                                }
-                                            ]
-                                        }
-                                    ]
-                                },
-                                "issuetype": {
-                                    "name": "Bug"
-                                }
-                            }
-                        }
-                        '''.stripIndent()
-
-                            bat """
+                        bat """
                         curl -X POST ^
                         -H "Authorization: ${authHeader}" ^
                         -H "Content-Type: application/json" ^
                         -H "Accept: application/json" ^
-                        --data '${jsonPayload}' ^
+                        --data "{ \\"fields\\": { \\"project\\": { \\"key\\": \\"PLPROJECT1\\" }, \\"summary\\": \\"Prueba desde Jenkins\\", \\"description\\": { \\"type\\": \\"doc\\", \\"version\\": 1, \\"content\\": [{\\"type\\": \\"paragraph\\", \\"content\\": [{\\"type\\": \\"text\\", \\"text\\": \\"Creando un issue desde Jenkins\\"}]}] }, \\"issuetype\\": { \\"name\\": \\"Bug\\" } } }" ^
                         "${JIRA_URL}"
                         """
-                        }
                     }
                 }
             }
+        }
     }
 
     post {
