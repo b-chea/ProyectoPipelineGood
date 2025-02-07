@@ -34,7 +34,7 @@ pipeline {
         stage('Create Jira Issue') {
             steps {
                 script {
-                    withCredentials([usernamePassword(credentialsId: 'jenkins-credentials', usernameVariable: 'JIRA_USER', passwordVariable: 'JIRA_AUTH_PSW')]) {
+                    withCredentials([usernamePassword(credentialsId: 'jenkins-credentials-local', usernameVariable: 'JIRA_USER', passwordVariable: 'JIRA_AUTH_PSW')]) {
                         def authHeader = "Basic " + "${JIRA_USER}:${JIRA_AUTH_PSW}".bytes.encodeBase64().toString()
 
                         bat """
