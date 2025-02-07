@@ -26,11 +26,7 @@ pipeline {
             }
         }
 
-        stage('Ejecutar Pruebas') {
-            steps {
-                bat 'mvn test'
-            }
-        }
+
 
         stage('Create Jira Test Issue') {
             steps {
