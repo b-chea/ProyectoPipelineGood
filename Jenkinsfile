@@ -43,6 +43,7 @@ pipeline {
                             "${JIRA_URL}"
                         """, returnStdout: true)
 
+                        // Usar readJSON para parsear la respuesta
                         def testIssueKey = readJSON(text: testIssueResponse).key
                         env.TEST_ISSUE_KEY = testIssueKey
                         echo "Created Jira Test Issue: ${testIssueKey}"
