@@ -1,79 +1,62 @@
 pipeline {
     agent any
-    environment{
+    environment {
         JIRA_SITE = 'https://bethsaidach-1738694022756.atlassian.net'
-        JIRA_CREDENTIALS_ID = 'jenkins-credentials'
-        JIRA_ISSUE_KEY = 'PROY-123'
-        JIRA_ISSUE_TYPE = 'ERROR'
+        JIRA_ISSUE_KEY = 'PLPROJECT1'
+        JIRA_ISSUE_TYPE = 'Bug'
+        JIRA_URL = "${JIRA_SITE}/rest/api/3/issue"
     }
+
     tools {
         maven 'MAVEN_HOME'
         jdk 'JAVA_HOME'
     }
+
     stages {
         stage('Build') {
             steps {
                 echo "Building..."
-                //jiraAddComment comment: 'Build iniciada en Jenkins', idOrKey: 'PROY-123', site: 'bethsaidach-1738694022756.atlassian.net'
             }
         }
 
         stage('Compilar proyecto') {
             steps {
-                sh 'mvn compile'
+                bat 'mvn compile'
             }
         }
 
-        stage('Ejectutar Pruebas') {
+        stage('Ejecutar Pruebas') {
             steps {
-                sh 'mvn test'
+                bat 'mvn test'
             }
         }
-
 
         stage('Create Jira Issue') {
             steps {
                 script {
-                    def jiraIssue = [
-                        fields: [
-                            project: [
-                                key: env.JIRA_ISSUE_KEY
-                            ],
-                            summary: "Build failed for ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-                            description: "The build failed. Please check the Jenkins logs for more details.",
-                            issuetype: [
-                                name: env.JIRA_ISSUE_TYPE
-                            ]
-                        ]
-                    ]
+                    withCredentials([usernamePassword(credentialsId: 'jenkins-credentials-local', usernameVariable: 'JIRA_USER', passwordVariable: 'JIRA_AUTH_PSW')]) {
+                        def authHeader = "Basic " + "${JIRA_USER}:${JIRA_AUTH_PSW}".bytes.encodeBase64().toString()
 
-                    def response = httpRequest(
-                        acceptType: 'APPLICATION_JSON',
-                        contentType: 'APPLICATION_JSON',
-                        httpMode: 'POST',
-                        requestBody: groovy.json.JsonOutput.toJson(jiraIssue),
-                        url: "${env.JIRA_SITE}/rest/api/4/issue",
-                        authentication: env.JIRA_CREDENTIALS_ID
-                    )
-
-                    echo "Jira issue created: ${response}"
-                    echo "Jira response: ${response.content}"
+                        bat """
+                        curl -X POST ^
+                        -H "Authorization: ${authHeader}" ^
+                        -H "Content-Type: application/json" ^
+                        -H "Accept: application/json" ^
+                        --data "{ \\"fields\\": { \\"project\\": { \\"key\\": \\"PLPROJECT1\\" }, \\"summary\\": \\"Prueba desde Jenkins\\", \\"description\\": { \\"type\\": \\"doc\\", \\"version\\": 1, \\"content\\": [{\\"type\\": \\"paragraph\\", \\"content\\": [{\\"type\\": \\"text\\", \\"text\\": \\"Creando un issue desde Jenkins\\"}]}] }, \\"issuetype\\": { \\"name\\": \\"Bug\\" } } }" ^
+                        "${JIRA_URL}"
+                        """
+                    }
                 }
             }
         }
-
-
     }
-    post {
 
+    post {
         success {
-            echo 'Successfully!'
+            echo 'Successfully created Jira issue!'
         }
         failure {
-            echo 'Failed!'
+            echo 'Build failed and Jira issue was not created!'
         }
-
     }
-
 }
-
