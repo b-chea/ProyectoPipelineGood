@@ -62,35 +62,36 @@ pipeline {
                         // Create Jira Test Issue
                         def createIssueResponse = bat(
                             script: """
-                            curl -X POST ^
-                            -H "Authorization: ${authHeader}" ^
-                            -H "Content-Type: application/json" ^
-                            -H "Accept: application/json" ^
-                            --data "{ \\"fields\\": { \\"project\\": { \\"key\\": \\"PLPROJECT1\\" }, \\"summary\\": \\"Automated Test Case from Jenkins\\", \\"description\\": { \\"type\\": \\"doc\\", \\"version\\": 1, \\"content\\": [{\\"type\\": \\"paragraph\\", \\"content\\": [{\\"type\\": \\"text\\", \\"text\\": \\"Automated test case generated from Jenkins pipeline\\"}]}] }, \\"issuetype\\": { \\"name\\": \\"Test\\" } } }" ^
-                            "${JIRA_URL}"
-                            """,
+                    curl -X POST ^
+                    -H "Authorization: ${authHeader}" ^
+                    -H "Content-Type: application/json" ^
+                    -H "Accept: application/json" ^
+                    --data "{ \\"fields\\": { \\"project\\": { \\"key\\": \\"PLPROJECT1\\" }, \\"summary\\": \\"Automated Test Case from Jenkins\\", \\"description\\": { \\"type\\": \\"doc\\", \\"version\\": 1, \\"content\\": [{\\"type\\": \\"paragraph\\", \\"content\\": [{\\"type\\": \\"text\\", \\"text\\": \\"Automated test case generated from Jenkins pipeline\\"}]}] }, \\"issuetype\\": { \\"name\\": \\"Test\\" } } }" ^
+                    "${JIRA_URL}"
+                    """,
                             returnStdout: true
                         ).trim()
 
                         // Parse issue key from response
                         def issueKey = (createIssueResponse =~ /"key":"([^"]+)"/)[0][1]
 
-                        // Prepare test steps JSON
+                        // Prepare test steps JSON with proper numbering
                         def testStepsJson = readFile(file: 'src/main/resources/data.csv').readLines()
-                        .collect { line ->
+                        .withIndex()
+                        .collect { line, index ->
                             def parts = line.split(',')
-                            return "{\"stepNumber\":\"${parts[0]}\",\"description\":\"${parts[1]}\",\"expectedResult\":\"${parts[2]}\"}"
+                            return "{\"stepNumber\":\"${index + 1}\",\"description\":\"${parts[1].trim()}\",\"expectedResult\":\"${parts[2].trim()}\"}"
                         }
                         .join(',')
 
                         // Add test steps to the issue using Xray API
                         bat """
-                        curl -X POST ^
-                        -H "Authorization: ${authHeader}" ^
-                        -H "Content-Type: application/json" ^
-                        "${XRAY_URL}/testcase" ^
-                        -d "{ \\"testCaseKey\\": \\"${issueKey}\\", \\"steps\\": [${testStepsJson}] }"
-                        """
+                curl -X POST ^
+                -H "Authorization: ${authHeader}" ^
+                -H "Content-Type: application/json" ^
+                "${XRAY_URL}/testcase" ^
+                -d "{ \\"testCaseKey\\": \\"${issueKey}\\", \\"steps\\": [${testStepsJson}] }"
+                """
                     }
                 }
             }
