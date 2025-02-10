@@ -50,7 +50,7 @@ pipeline {
                 }
             }
         }
-            stages {
+
                 stage('Import Test Steps') {
                     steps {
                         script {
@@ -77,7 +77,7 @@ pipeline {
                         }
                     }
                 }
-            }
+
 
 
 
