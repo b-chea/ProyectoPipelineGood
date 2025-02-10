@@ -46,6 +46,7 @@ pipeline {
                         --data "{ \\"fields\\": { \\"project\\": { \\"key\\": \\"PLPROJECT1\\" }, \\"summary\\": \\"Prueba desde Jenkins\\", \\"description\\": { \\"type\\": \\"doc\\", \\"version\\": 1, \\"content\\": [{\\"type\\": \\"paragraph\\", \\"content\\": [{\\"type\\": \\"text\\", \\"text\\": \\"Creando un issue test desde Jenkins\\"}]}] }, \\"issuetype\\": { \\"name\\": \\"Test\\" } } }" ^
                         "${JIRA_URL}"
                         """
+                        step([$class: 'XrayImportFeatureBuilder', credentialId: 'jenkins-credentials-local', folderPath: 'data.csv', lastModified: '', preconditions: '', projectKey: 'PLPROJECT1', serverInstance: 'SERVER-212c1cfc-fb9c-462e-8815-6dfa9ec27e49', testInfo: ''])
                     }
                 }
             }
