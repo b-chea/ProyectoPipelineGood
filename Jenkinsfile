@@ -50,10 +50,6 @@ pipeline {
                 }
             }
         }
-
-        pipeline {
-            agent any
-
             stages {
                 stage('Import Test Steps') {
                     steps {
@@ -82,7 +78,7 @@ pipeline {
                     }
                 }
             }
-        }
+
 
 
         stage('Create Jira Issue') {
