@@ -53,35 +53,6 @@ pipeline {
             }
         }
 
-
-        stage('Create Test---- Jira Issue with Steps') {
-            steps {
-                script {
-                    withCredentials([usernamePassword(credentialsId: 'jenkins-credentials-local', usernameVariable: 'JIRA_USER', passwordVariable: 'JIRA_AUTH_PSW')]) {
-                        def authHeader = "Basic " + "${JIRA_USER}:${JIRA_AUTH_PSW}".bytes.encodeBase64().toString()
-
-                        // Create Test Case
-                        bat """
-                curl -X POST ^
-                -H "Authorization: ${authHeader}" ^
-                -H "Content-Type: application/json" ^
-                "${JIRA_SITE}/rest/raven/1.0/api/testexec/testcase" ^
-                -d "{
-                    \\"testCaseKey\\": \\"PLPROJECT1-60\\",
-                    \\"steps\\": [
-                        {
-                            \\"stepNumber\\": \\"1\\",
-                            \\"description\\": \\"Step Description\\",
-                            \\"expectedResult\\": \\"Expected Outcome\\"
-                        }
-                    ]
-                }"
-                """
-                    }
-                }
-            }
-        }
-
         stage('Create Test Jira Issue with Steps') {
             steps {
                 script {
