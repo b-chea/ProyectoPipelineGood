@@ -62,13 +62,13 @@ pipeline {
                         // Create Jira Test Issue
                         def createIssueResponse = bat(
                             script: """
-                        curl -X POST ^
-                        -H "Authorization: ${authHeader}" ^
-                        -H "Content-Type: application/json" ^
-                        -H "Accept: application/json" ^
-                        --data "{ \\"fields\\": { \\"project\\": { \\"key\\": \\"PLPROJECT1\\" }, \\"summary\\": \\"Automated Test Case from Jenkins\\", \\"description\\": { \\"type\\": \\"doc\\", \\"version\\": 1, \\"content\\": [{\\"type\\": \\"paragraph\\", \\"content\\": [{\\"type\\": \\"text\\", \\"text\\": \\"Automated test case generated from Jenkins pipeline\\"}]}] }, \\"issuetype\\": { \\"name\\": \\"Test\\" } } }" ^
-                        "${JIRA_URL}"
-                      """,
+                            curl -X POST ^
+                            -H "Authorization: ${authHeader}" ^
+                            -H "Content-Type: application/json" ^
+                            -H "Accept: application/json" ^
+                            --data "{ \\"fields\\": { \\"project\\": { \\"key\\": \\"PLPROJECT1\\" }, \\"summary\\": \\"Automated Test Case from Jenkins\\", \\"description\\": { \\"type\\": \\"doc\\", \\"version\\": 1, \\"content\\": [{\\"type\\": \\"paragraph\\", \\"content\\": [{\\"type\\": \\"text\\", \\"text\\": \\"Automated test case generated from Jenkins pipeline\\"}]}] }, \\"issuetype\\": { \\"name\\": \\"Test\\" } } }" ^
+                            "${JIRA_URL}"
+                            """,
                             returnStdout: true
                         ).trim()
 
@@ -77,15 +77,15 @@ pipeline {
 
                         // Add test steps to the issue using Xray API
                         bat """
-                        curl -X POST ^
+                        curl -v -X POST ^
                         -H "Authorization: ${authHeader}" ^
                         -H "Content-Type: application/json" ^
-                        "${XRAY_URL}/testcase" ^
-                        --data "{
-                           \\"testCaseKey\\": \\"${issueKey}\\",
-                           \\"steps\\": ${env.FORMATTED_TEST_STEPS}
-                        }"
-                   """
+                        -H "Accept: application/json" ^
+                        "${XRAY_URL}/import/execution/multipart" ^
+                        -F "testCaseKey=${issueKey}" ^
+                        -F "info={\"summary\":\"Test Execution\",\"description\":\"Automated test execution\",\"user\":\"${JIRA_USER}\"}" ^
+                        -F "results=[{"testCaseKey":"${issueKey}","status":"PASSED"}]"
+                        """
                     }
                 }
             }
