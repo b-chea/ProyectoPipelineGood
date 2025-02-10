@@ -51,6 +51,12 @@ pipeline {
             }
         }
 
+        stage('Export feature files') {
+            steps {
+                step([$class: 'XrayExportBuilder', issues: 'PLPROJECT1', serverInstance: '212c1cfc-fb9c-462e-8815-6dfa9ec27e49'])
+            }
+        }
+
                 stage('Import Test Steps') {
                     steps {
                         script {
