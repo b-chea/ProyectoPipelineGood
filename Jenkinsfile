@@ -67,7 +67,7 @@ pipeline {
                 -H "Content-Type: application/json" ^
                 "${JIRA_SITE}/rest/raven/1.0/api/testexec/testcase" ^
                 -d "{
-                    \\"testCaseKey\\": \\"PLPROJECT1-61\\",
+                    \\"testCaseKey\\": \\"PLPROJECT1-60\\",
                     \\"steps\\": [
                         {
                             \\"stepNumber\\": \\"1\\",
