@@ -38,7 +38,7 @@ pipeline {
             steps {
                 script {
                     // Read CSV file with test steps
-                    def testSteps = readFile(file: 'data.csv').readLines()
+                    def testSteps = readFile(file: 'src/main/resources/data.csv').readLines()
                     def formattedTestSteps = []
 
                     // Parse CSV and format test steps for Jira
