@@ -32,8 +32,6 @@ pipeline {
             }
         }
 
-
-
         stage('Prepare CSV Test Steps') {
             steps {
                 script {
@@ -43,16 +41,14 @@ pipeline {
 
                     // Parse CSV and format test steps for Jira
                     testSteps.each { line ->
-                        def (stepNumber, description, expectedResult) = line.split(',')
-                        formattedTestSteps << [
-                            "stepNumber": stepNumber.trim(),
-                            "description": description.trim(),
-                            "expectedResult": expectedResult.trim()
-                        ]
+                        def parts = line.split(',')
+                        if (parts.length >= 3) {
+                            formattedTestSteps << '{"stepNumber":"' + parts[0].trim() + '", "description":"' + parts[1].trim() + '", "expectedResult":"' + parts[2].trim() + '"}'
+                        }
                     }
 
-                    // Store formatted test steps as environment variable
-                    env.FORMATTED_TEST_STEPS = groovy.json.JsonOutput.toJson(formattedTestSteps)
+                    // Convert list to JSON string manually
+                    env.FORMATTED_TEST_STEPS = '[' + formattedTestSteps.join(',') + ']'
                 }
             }
         }
@@ -94,6 +90,8 @@ pipeline {
                 }
             }
         }
+
+
 
 
 
