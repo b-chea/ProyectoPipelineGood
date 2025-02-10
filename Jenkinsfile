@@ -64,23 +64,17 @@ pipeline {
                     withCredentials([usernamePassword(credentialsId: 'jenkins-credentials-local', usernameVariable: 'JIRA_USER', passwordVariable: 'JIRA_AUTH_PSW')]) {
                         def authHeader = "Basic " + "${JIRA_USER}:${JIRA_AUTH_PSW}".bytes.encodeBase64().toString()
 
-                        // Crear un issue de prueba en Jira
-                        def createIssueResponse = bat(
-                            script: """
-                            curl -X POST ^
-                            -H "Authorization: ${authHeader}" ^
-                            -H "Content-Type: application/json" ^
-                            -H "Accept: application/json" ^
-                            --data "{ \\"fields\\": { \\"project\\": { \\"key\\": \\"PLPROJECT1\\" }, \\"summary\\": \\"Automated Test Case from Jenkins\\", \\"description\\": { \\"type\\": \\"doc\\", \\"version\\": 1, \\"content\\": [{\\"type\\": \\"paragraph\\", \\"content\\": [{\\"type\\": \\"text\\", \\"text\\": \\"Automated test case generated from Jenkins pipeline\\"}]}] }, \\"issuetype\\": { \\"name\\": \\"Test\\" } } }" ^
-                            "${JIRA_URL}"
-                            """,
-                            returnStdout: true
-                        ).trim()
+                        // Crear un archivo temporal con el JSON
+                        def jsonPayload = """
+                        {
+                            "steps": ${env.FORMATTED_TEST_STEPS},
+                            "callTestDatasets": [],
+                            "importType": "csv"
+                        }
+                        """
+                        writeFile(file: 'temp_payload.json', text: jsonPayload)
 
-                        // Extraer la clave del issue creado
-                        def issueKey = (createIssueResponse =~ /"key":"([^"]+)"/)[0][1]
-
-                        // Agregar los pasos de prueba al issue usando la API de Xray
+                        // Enviar la solicitud a la API de Xray usando el archivo temporal
                         bat """
                         curl -X POST ^
                         -H "Authorization: ${authHeader}" ^
@@ -99,7 +93,7 @@ pipeline {
                         -H "sec-ch-ua-mobile: ?0" ^
                         -H "sec-ch-ua-platform: \\"Windows\\"" ^
                         "${XRAY_URL}?testVersionId=67a9f5d200cff4d61001bdd2&resetSteps=false" ^
-                        -d "{ \\"steps\\": ${env.FORMATTED_TEST_STEPS}, \\"callTestDatasets\\": [], \\"importType\\": \\"csv\\" }"
+                        --data @temp_payload.json
                         """
                     }
                 }
