@@ -6,8 +6,6 @@ pipeline {
         JIRA_ISSUE_TYPE = 'Bug'
         JIRA_URL = "${JIRA_SITE}/rest/api/3/issue"
         XRAY_URL = 'https://us.xray.cloud.getxray.app/api/internal/10000/test/10042/import' // URL de Xray
-
-
     }
 
     tools {
@@ -34,22 +32,7 @@ pipeline {
             }
         }
 
-        stage('Generate Xray Token') {
-            steps {
-                script {
-                    // Generar un nuevo token JWT
-                    def tokenResponse = sh(script: """
-                        curl -X POST \
-                        -H "Content-Type: application/json" \
-                        -d '{"client_id": "${XRAY_CLIENT_ID}", "client_secret": "${XRAY_CLIENT_SECRET}"}' \
-                        "https://xray.cloud.getxray.app/api/v2/authenticate"
-                    """, returnStdout: true).trim()
 
-                    // Extraer el token de la respuesta
-                    env.XRAY_TOKEN = tokenResponse.replaceAll('"', '')
-                }
-            }
-        }
 
         stage('Prepare CSV Test Steps') {
             steps {
