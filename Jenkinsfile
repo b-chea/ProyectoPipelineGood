@@ -32,65 +32,57 @@ pipeline {
             }
         }
 
-        stage('Prepare CSV Test Steps') {
+        stage('Prepare Test Steps') {
             steps {
                 script {
-                    // Read CSV file with test steps
                     def testSteps = readFile(file: 'src/main/resources/data.csv').readLines()
-                    def formattedTestSteps = []
-
-                    // Parse CSV and format test steps for Jira
-                    testSteps.each { line ->
+                    .collect { line ->
                         def parts = line.split(',')
-                        if (parts.length >= 3) {
-                            formattedTestSteps << '{"stepNumber":"' + parts[0].trim() + '", "description":"' + parts[1].trim() + '", "expectedResult":"' + parts[2].trim() + '"}'
-                        }
+                        return [
+                            stepNumber: parts[0].trim(),
+                            description: parts[1].trim(),
+                            expectedResult: parts[2].trim()
+                        ]
                     }
 
-                    // Convert list to JSON string manually
-                    env.FORMATTED_TEST_STEPS = '[' + formattedTestSteps.join(',') + ']'
+                    env.FORMATTED_TEST_STEPS = groovy.json.JsonOutput.toJson(testSteps)
                 }
             }
         }
 
-        stage('Create Test Jira Issue with Steps') {
+        stage('Create Xray Test Case') {
             steps {
                 script {
                     withCredentials([usernamePassword(credentialsId: 'jenkins-credentials-local', usernameVariable: 'JIRA_USER', passwordVariable: 'JIRA_AUTH_PSW')]) {
                         def authHeader = "Basic " + "${JIRA_USER}:${JIRA_AUTH_PSW}".bytes.encodeBase64().toString()
 
-                        // Create Jira Test Issue
-                        def createIssueResponse = bat(
+                        def testSteps = readFile(file: 'src/main/resources/data.csv').readLines()
+                        .collect { line ->
+                            def parts = line.split(',')
+                            return [
+                                stepNumber: parts[0].trim(),
+                                description: parts[1].trim(),
+                                expectedResult: parts[2].trim()
+                            ]
+                        }
+
+                        def payload = groovy.json.JsonOutput.toJson([
+                            testCaseKey: "${JIRA_ISSUE_KEY}-55",
+                            steps: testSteps
+                        ])
+
+                        def response = bat(
                             script: """
-                            curl -X POST ^
+                            curl -v -X POST ^
                             -H "Authorization: ${authHeader}" ^
                             -H "Content-Type: application/json" ^
-                            -H "Accept: application/json" ^
-                            --data "{ \\"fields\\": { \\"project\\": { \\"key\\": \\"PLPROJECT1\\" }, \\"summary\\": \\"Automated Test Case from Jenkins\\", \\"description\\": { \\"type\\": \\"doc\\", \\"version\\": 1, \\"content\\": [{\\"type\\": \\"paragraph\\", \\"content\\": [{\\"type\\": \\"text\\", \\"text\\": \\"Automated test case generated from Jenkins pipeline\\"}]}] }, \\"issuetype\\": { \\"name\\": \\"Test\\" } } }" ^
-                            "${JIRA_URL}"
+                            "${XRAY_URL}/testcase" ^
+                            -d "${payload.replace('"', '\\"')}"
                             """,
                             returnStdout: true
                         ).trim()
 
-                        // Parse issue key from response
-                        def issueKey = (createIssueResponse =~ /"key":"([^"]+)"/)[0][1]
-
-                        // Prepare test steps JSON
-                        def testStepsJson = readFile(file: 'src/main/resources/data.csv').readLines()
-                        .collect { line ->
-                            def parts = line.split(',')
-                            return "{\"stepNumber\":\"${parts[0]}\",\"description\":\"${parts[1]}\",\"expectedResult\":\"${parts[2]}\"}"
-                        }
-                        .join(',')
-
-                        // Add test steps to the issue using Xray API
-                        bat """
-                        curl -X POST ^
-                        -H "Authorization: ${authHeader}" ^
-                        -H "Content-Type: application/json" ^
-                        "${XRAY_URL}/testcase" ^
-                        -d "{ \\"testCaseKey\\": \\"${issueKey}\\", \\"steps\\": [${testStepsJson}] }"
-                        """
+                        echo "Xray Test Case Response: ${response}"
                     }
                 }
             }
