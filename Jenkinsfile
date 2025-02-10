@@ -75,16 +75,21 @@ pipeline {
                         // Parse issue key from response
                         def issueKey = (createIssueResponse =~ /"key":"([^"]+)"/)[0][1]
 
+                        // Prepare test steps JSON
+                        def testStepsJson = readFile(file: 'src/main/resources/data.csv').readLines()
+                        .collect { line ->
+                            def parts = line.split(',')
+                            return "{\"stepNumber\":\"${parts[0]}\",\"description\":\"${parts[1]}\",\"expectedResult\":\"${parts[2]}\"}"
+                        }
+                        .join(',')
+
                         // Add test steps to the issue using Xray API
                         bat """
-                        curl -v -X POST ^
+                        curl -X POST ^
                         -H "Authorization: ${authHeader}" ^
                         -H "Content-Type: application/json" ^
-                        -H "Accept: application/json" ^
-                        "${XRAY_URL}/import/execution/multipart" ^
-                        -F "testCaseKey=${issueKey}" ^
-                        -F "info={\"summary\":\"Test Execution\",\"description\":\"Automated test execution\",\"user\":\"${JIRA_USER}\"}" ^
-                        -F "results=[{"testCaseKey":"${issueKey}","status":"PASSED"}]"
+                        "${XRAY_URL}/testcase" ^
+                        -d "{ \\"testCaseKey\\": \\"${issueKey}\\", \\"steps\\": [${testStepsJson}] }"
                         """
                     }
                 }
