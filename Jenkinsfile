@@ -52,9 +52,9 @@ pipeline {
                             https://xray.cloud.getxray.app/api/v2/authenticate > token.txt
                         '''
 
-                        def token = readFile('token.txt').trim()
+                        def token = readFile('token.txt').trim().replaceAll('"', '')
                         bat 'del auth.json token.txt'
-                        env.XRAY_TOKEN = token.replaceAll('"', '')
+                        env.XRAY_TOKEN = token
                     }
                 }
             }
@@ -84,61 +84,15 @@ pipeline {
                             "%JIRA_URL%" > issue_response.json
                         '''
 
-                        def issueKey = bat(
-                            script: '''
-                                powershell -Command "& {
-                                    $json = Get-Content issue_response.json | ConvertFrom-Json;
-                                    echo $json.key
-                                }"
-                            ''', returnStdout: true
-                        ).trim()
+                        def issueKey = powershell(script: '''
+                            $json = Get-Content issue_response.json -Raw | ConvertFrom-Json;
+                            echo $json.key
+                        ''', returnStdout: true).trim()
 
                         if (!issueKey) {
                             error "No se pudo obtener el issue key de Jira"
                         }
                         env.ISSUE_KEY = issueKey
-
-                        bat """
-                            curl -H "Authorization: Bearer %XRAY_TOKEN%" ^
-                            -H "Content-Type: application/json" ^
-                            "https://us.xray.cloud.getxray.app/api/internal/10000/graphql" ^
-                            -d "{\\"query\\":\\"query { getTests(jql: \\\\\\"key = ${issueKey}\\\\\\") { results { id testType { name } } } }\\"}" > test_info.json
-                        """
-
-                        def testId = bat(
-                            script: '''
-                                powershell -Command "& {
-                                    $json = Get-Content test_info.json | ConvertFrom-Json;
-                                    echo $json.data.getTests.results[0].id
-                                }"
-                            ''', returnStdout: true
-                        ).trim()
-
-                        if (!testId) {
-                            error "No se pudo obtener el test ID"
-                        }
-                        env.TEST_ID = testId
-
-                        bat """
-                            curl -H "Authorization: Bearer %XRAY_TOKEN%" ^
-                            -H "Content-Type: application/json" ^
-                            "https://us.xray.cloud.getxray.app/api/internal/10000/graphql" ^
-                            -d "{\\"query\\":\\"query { getTestById(id: \\\\\\"${testId}\\\\\\") { latestVersion { id } } }\\"}" > version_info.json
-                        """
-
-                        def versionId = bat(
-                            script: '''
-                                powershell -Command "& {
-                                    $json = Get-Content version_info.json | ConvertFrom-Json;
-                                    echo $json.data.getTestById.latestVersion.id
-                                }"
-                            ''', returnStdout: true
-                        ).trim()
-
-                        if (!versionId) {
-                            error "No se pudo obtener el version ID"
-                        }
-                        env.VERSION_ID = versionId
                     }
                 }
             }
@@ -148,21 +102,17 @@ pipeline {
             steps {
                 script {
                     def testSteps = readFile(file: 'src/main/resources/data.csv').readLines()
-                    def formattedSteps = new StringBuilder("[")
-                    testSteps.drop(1).eachWithIndex { line, index ->
+                    def formattedSteps = testSteps.drop(1).collect { line ->
                         def parts = line.split(',')
                         if (parts.length >= 3) {
-                            if (index > 0) formattedSteps.append(',')
-                            formattedSteps.append("""{
-                                "action": "${parts[0].trim()}",
-                                "data": "${parts[1].trim()}",
-                                "result": "${parts[2].trim()}"
-                            }""")
+                            return """{
+                                \"action\": \"${parts[0].trim()}\",
+                                \"data\": \"${parts[1].trim()}\",
+                                \"result\": \"${parts[2].trim()}\"
+                            }"""
                         }
-                    }
-                    formattedSteps.append("]")
-
-                    env.FORMATTED_TEST_STEPS = formattedSteps.toString()
+                    }.join(',')
+                    env.FORMATTED_TEST_STEPS = "[${formattedSteps}]"
                 }
             }
         }
@@ -192,11 +142,7 @@ pipeline {
     post {
         always {
             bat '''
-                if exist payload.json del payload.json
-                if exist create_issue.json del create_issue.json
-                if exist issue_response.json del issue_response.json
-                if exist test_info.json del test_info.json
-                if exist version_info.json del version_info.json
+                del /F /Q payload.json create_issue.json issue_response.json test_info.json version_info.json
             '''
         }
         success {
