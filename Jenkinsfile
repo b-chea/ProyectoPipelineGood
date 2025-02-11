@@ -40,8 +40,8 @@ pipeline {
                         passwordVariable: 'XRAY_CLIENT_SECRET')]) {
 
                         writeFile file: 'auth.json', text: """{
-                            "client_id": "${XRAY_CLIENT_ID}",
-                            "client_secret": "${XRAY_CLIENT_SECRET}"
+                            \"client_id\": \"${XRAY_CLIENT_ID}\",
+                            \"client_secret\": \"${XRAY_CLIENT_SECRET}\"
                         }"""
 
                         bat '''
@@ -67,11 +67,11 @@ pipeline {
                         passwordVariable: 'JIRA_AUTH_PSW')]) {
 
                         writeFile file: 'create_issue.json', text: """{
-                            "fields": {
-                                "project": { "key": "${JIRA_ISSUE_KEY}" },
-                                "summary": "Automated Test Case from Jenkins",
-                                "description": { "type": "doc", "version": 1, "content": [{ "type": "paragraph", "content": [{ "type": "text", "text": "Automated test case generated from Jenkins pipeline" }] }] },
-                                "issuetype": { "name": "${JIRA_ISSUE_TYPE}" }
+                            \"fields\": {
+                                \"project\": { \"key\": \"${JIRA_ISSUE_KEY}\" },
+                                \"summary\": \"Automated Test Case from Jenkins\",
+                                \"description\": { \"type\": \"doc\", \"version\": 1, \"content\": [{ \"type\": \"paragraph\", \"content\": [{ \"type\": \"text\", \"text\": \"Automated test case generated from Jenkins pipeline\" }] }] },
+                                \"issuetype\": { \"name\": \"${JIRA_ISSUE_TYPE}\" }
                             }
                         }"""
 
@@ -91,7 +91,7 @@ pipeline {
                         if (!issueKey) {
                             error "No se pudo obtener el issue key de Jira"
                         }
-                        env.ISSUE_KEY = issueKey
+                        env.TEST_ID = issueKey
                     }
                 }
             }
@@ -119,18 +119,26 @@ pipeline {
         stage('Import Test Steps') {
             steps {
                 script {
+                    if (!env.TEST_ID) {
+                        error "TEST_ID no está definido"
+                    }
+
                     writeFile file: 'payload.json', text: """{
-                        "steps": ${env.FORMATTED_TEST_STEPS},
-                        "callTestDatasets": [],
-                        "importType": "csv"
+                        \"steps\": ${env.FORMATTED_TEST_STEPS},
+                        \"callTestDatasets\": [],
+                        \"importType\": \"csv\"
                     }"""
+
+                    echo "Test ID: ${env.TEST_ID}"
+                    echo "Xray Token: ${env.XRAY_TOKEN}"
+                    bat 'type payload.json'
 
                     bat '''
                         curl -X POST ^
                         -H "Authorization: Bearer %XRAY_TOKEN%" ^
                         -H "Content-Type: application/json" ^
                         -H "Accept: application/json" ^
-                        "https://us.xray.cloud.getxray.app/api/internal/10000/test/%TEST_ID%/import?testVersionId=%VERSION_ID%&resetSteps=false" ^
+                        "https://us.xray.cloud.getxray.app/api/internal/10000/test/%TEST_ID%/import?resetSteps=false" ^
                         -d @payload.json
                     '''
                 }
@@ -141,7 +149,7 @@ pipeline {
     post {
         always {
             bat '''
-                del /F /Q payload.json create_issue.json issue_response.json test_info.json version_info.json
+                del /F /Q payload.json create_issue.json issue_response.json
             '''
         }
         success {
