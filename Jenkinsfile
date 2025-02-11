@@ -5,10 +5,7 @@ pipeline {
         JIRA_ISSUE_KEY = 'PLPROJECT1'
         JIRA_ISSUE_TYPE = 'Test'
         JIRA_URL = "${JIRA_SITE}/rest/api/3/issue"
-        XRAY_URL = 'https://us.xray.cloud.getxray.app/api/internal/10000/test/10042/import' // URL de Xray
-
-        XRAY_CLIENT_ID = credentials('xray-client-id')
-        XRAY_CLIENT_SECRET = credentials('xray-client-secret')
+        XRAY_BASE_URL = 'https://us.xray.cloud.getxray.app/api/internal/10000/test'
     }
 
     tools {
@@ -38,39 +35,104 @@ pipeline {
         stage('Generate Xray Token') {
             steps {
                 script {
-                    // Generar un nuevo token JWT
-                    def tokenResponse = sh(script: """
-                        curl -X POST \
-                        -H "Content-Type: application/json" \
-                        -d '{"client_id": "${XRAY_CLIENT_ID}", "client_secret": "${XRAY_CLIENT_SECRET}"}' \
-                        "https://xray.cloud.getxray.app/api/v2/authenticate"
-                    """, returnStdout: true).trim()
+                    withCredentials([
+                        usernamePassword(credentialsId: 'xray-credentials',
+                            usernameVariable: 'XRAY_CLIENT_ID',
+                            passwordVariable: 'XRAY_CLIENT_SECRET')
+                    ]) {
+                        // Create auth payload file
+                        writeFile file: 'auth.json', text: """{
+                            "client_id": "${XRAY_CLIENT_ID}",
+                            "client_secret": "${XRAY_CLIENT_SECRET}"
+                        }"""
 
-                    // Extraer el token de la respuesta
-                    env.XRAY_TOKEN = tokenResponse.replaceAll('"', '')
+                        // Get token and save to file
+                        bat '''
+                            curl -X POST ^
+                            -H "Content-Type: application/json" ^
+                            -d @auth.json ^
+                            https://xray.cloud.getxray.app/api/v2/authenticate > token.txt
+                        '''
+
+                        def token = readFile('token.txt').trim()
+                        bat 'del auth.json token.txt'
+                        env.XRAY_TOKEN = token.replaceAll('"', '')
+                    }
                 }
             }
         }
 
-        stage('Create Jira Issue') {
+        stage('Create Jira Test Issue') {
             steps {
                 script {
-                    withCredentials([usernamePassword(credentialsId: 'jenkins-credentials-local', usernameVariable: 'JIRA_USER', passwordVariable: 'JIRA_AUTH_PSW')]) {
-                        def authHeader = "Basic " + "${JIRA_USER}:${JIRA_AUTH_PSW}".bytes.encodeBase64().toString()
+                    withCredentials([usernamePassword(credentialsId: 'jenkins-credentials-local',
+                        usernameVariable: 'JIRA_USER',
+                        passwordVariable: 'JIRA_AUTH_PSW')]) {
+                        // Create Jira test issue
+                        writeFile file: 'create_issue.json', text: """{
+                            "fields": {
+                                "project": {
+                                    "key": "${JIRA_ISSUE_KEY}"
+                                },
+                                "summary": "Automated Test Case from Jenkins",
+                                "description": {
+                                    "type": "doc",
+                                    "version": 1,
+                                    "content": [
+                                        {
+                                            "type": "paragraph",
+                                            "content": [
+                                                {
+                                                    "type": "text",
+                                                    "text": "Automated test case generated from Jenkins pipeline"
+                                                }
+                                            ]
+                                        }
+                                    ]
+                                },
+                                "issuetype": {
+                                    "name": "${JIRA_ISSUE_TYPE}"
+                                }
+                            }
+                        }"""
 
-                        // Crear un issue en Jira
-                        def createIssueResponse = bat(script: """
+                        // Create issue and get response
+                        bat '''
                             curl -X POST ^
-                            -H "Authorization: ${authHeader}" ^
+                            -u "%JIRA_USER%:%JIRA_AUTH_PSW%" ^
                             -H "Content-Type: application/json" ^
-                            -H "Accept: application/json" ^
-                            --data "{ \\"fields\\": { \\"project\\": { \\"key\\": \\"${JIRA_ISSUE_KEY}\\" }, \\"summary\\": \\"Automated Test Case from Jenkins\\", \\"description\\": { \\"type\\": \\"doc\\", \\"version\\": 1, \\"content\\": [{\\"type\\": \\"paragraph\\", \\"content\\": [{\\"type\\": \\"text\\", \\"text\\": \\"Automated test case generated from Jenkins pipeline\\"}]}] }, \\"issuetype\\": { \\"name\\": \\"${JIRA_ISSUE_TYPE}\\" } } }" ^
-                            "${JIRA_URL}"
-                        """, returnStdout: true).trim()
+                            -d @create_issue.json ^
+                            "%JIRA_URL%" > issue_response.json
+                        '''
 
-                        // Extraer la clave del issue creado
-                        def issueKey = (createIssueResponse =~ /"key":"([^"]+)"/)[0][1]
-                        echo "Created Jira issue: ${issueKey}"
+                        // Read and parse the response
+                        def issueResponse = readFile('issue_response.json')
+                        def issueJson = new groovy.json.JsonSlurper().parseText(issueResponse)
+                        env.ISSUE_KEY = issueJson.key
+
+                        // Get Xray test ID
+                        bat '''
+                            curl -H "Authorization: Bearer %XRAY_TOKEN%" ^
+                            -H "Content-Type: application/json" ^
+                            "https://us.xray.cloud.getxray.app/api/internal/10000/graphql" ^
+                            -d "{\\"query\\":\\"query { getTests(jql: \\\\\\"key = %ISSUE_KEY%\\\\\\") { results { id testType { name } } } }\\"}" > test_info.json
+                        '''
+
+                        def testInfo = readFile('test_info.json')
+                        def testJson = new groovy.json.JsonSlurper().parseText(testInfo)
+                        env.TEST_ID = testJson.data.getTests.results[0].id
+
+                        // Get latest test version
+                        bat '''
+                            curl -H "Authorization: Bearer %XRAY_TOKEN%" ^
+                            -H "Content-Type: application/json" ^
+                            "https://us.xray.cloud.getxray.app/api/internal/10000/graphql" ^
+                            -d "{\\"query\\":\\"query { getTestById(id: \\\\\\"${TEST_ID}\\\\\\") { latestVersion { id } } }\\"}" > version_info.json
+                        '''
+
+                        def versionInfo = readFile('version_info.json')
+                        def versionJson = new groovy.json.JsonSlurper().parseText(versionInfo)
+                        env.VERSION_ID = versionJson.data.getTestById.latestVersion.id
                     }
                 }
             }
@@ -79,78 +141,66 @@ pipeline {
         stage('Prepare CSV Test Steps') {
             steps {
                 script {
-                    // Leer el archivo CSV y formatear los pasos de prueba
                     def testSteps = readFile(file: 'src/main/resources/data.csv').readLines()
                     def formattedTestSteps = []
 
-                    testSteps.each { line ->
+                    testSteps.drop(1).each { line ->
                         def parts = line.split(',')
                         if (parts.length >= 3) {
-                            formattedTestSteps << """
-                            {
-                                "action": "${parts[0].trim()}",
-                                "data": "${parts[1].trim()}",
-                                "result": "${parts[2].trim()}"
-                            }
-                            """
+                            def step = [
+                                action: parts[0].trim(),
+                                data: parts[1].trim(),
+                                result: parts[2].trim()
+                            ]
+                            formattedTestSteps << groovy.json.JsonOutput.toJson(step)
                         }
                     }
 
-                    // Convertir la lista a un JSON válido
-                    env.FORMATTED_TEST_STEPS = '[' + formattedTestSteps.join(',') + ']'
+                    env.FORMATTED_TEST_STEPS = "[${formattedTestSteps.join(',')}]"
                 }
             }
         }
 
-        stage('Create Test Jira Issue with Steps') {
+        stage('Import Test Steps') {
             steps {
                 script {
-                    withCredentials([usernamePassword(credentialsId: 'jenkins-credentials-local', usernameVariable: 'JIRA_USER', passwordVariable: 'JIRA_AUTH_PSW')]) {
-                        def authHeader = "Basic " + "${JIRA_USER}:${JIRA_AUTH_PSW}".bytes.encodeBase64().toString()
+                    def payload = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson([
+                        steps: new groovy.json.JsonSlurper().parseText(env.FORMATTED_TEST_STEPS),
+                        callTestDatasets: [],
+                        importType: "csv"
+                    ]))
 
-                        // Crear un archivo temporal con el JSON
-                        def jsonPayload = """
-                        {
-                            "steps": ${env.FORMATTED_TEST_STEPS},
-                            "callTestDatasets": [],
-                            "importType": "csv"
-                        }
-                        """
-                        writeFile(file: 'temp_payload.json', text: jsonPayload)
+                    writeFile file: 'payload.json', text: payload
 
-                        // Enviar la solicitud a la API de Xray usando el archivo temporal
-                        bat """
+                    // Use the dynamic TEST_ID and VERSION_ID
+                    bat '''
                         curl -X POST ^
-                        -H "Authorization: Bearer ${env.XRAY_TOKEN}" ^
+                        -H "Authorization: Bearer %XRAY_TOKEN%" ^
                         -H "Content-Type: application/json" ^
-                        -H "Accept: application/json, text/plain, */*" ^
-                        -H "Accept-Language: es-419,es;q=0.9,es-ES;q=0.8,en;q=0.7,en-GB;q=0.6,en-US;q=0.5" ^
-                        -H "Connection: keep-alive" ^
-                        -H "Origin: https://us.xray.cloud.getxray.app" ^
-                        -H "Referer: https://us.xray.cloud.getxray.app/view/dialog/test/manual-steps-import?xdm_e=https%3A%2F%2Fbethsaidach-1738694022756.atlassian.net&xdm_c=channel-com.xpandit.plugins.xray__manual-steps-import&cp=&xdm_deprecated_addon_key_do_not_use=com.xpandit.plugins.xray&lic=active&cv=1001.0.0-SNAPSHOT" ^
-                        -H "Sec-Fetch-Dest: empty" ^
-                        -H "Sec-Fetch-Mode: cors" ^
-                        -H "Sec-Fetch-Site: same-origin" ^
-                        -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36 Edg/132.0.0.0" ^
-                        -H "X-acpt: ${env.XRAY_TOKEN}" ^
-                        -H "sec-ch-ua: \\"Not A(Brand\\";v=\\"8\\", \\"Chromium\\";v=\\"132\\", \\"Microsoft Edge\\";v=\\"132\\"" ^
-                        -H "sec-ch-ua-mobile: ?0" ^
-                        -H "sec-ch-ua-platform: \\"Windows\\"" ^
-                        "${XRAY_URL}?testVersionId=67a9f5d200cff4d61001bdd2&resetSteps=false" ^
-                        --data @temp_payload.json
-                        """
-                    }
+                        -H "Accept: application/json" ^
+                        "https://us.xray.cloud.getxray.app/api/internal/10000/test/%TEST_ID%/import?testVersionId=%VERSION_ID%&resetSteps=false" ^
+                        -d @payload.json
+                    '''
                 }
             }
         }
     }
 
     post {
+        always {
+            bat '''
+                if exist payload.json del payload.json
+                if exist create_issue.json del create_issue.json
+                if exist issue_response.json del issue_response.json
+                if exist test_info.json del test_info.json
+                if exist version_info.json del version_info.json
+            '''
+        }
         success {
-            echo 'Successfully created Jira issue with test steps!'
+            echo 'Successfully created Jira test issue and imported steps!'
         }
         failure {
-            echo 'Build failed and Jira issue was not created!'
+            echo 'Build failed!'
         }
     }
 }
