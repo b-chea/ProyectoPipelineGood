@@ -35,11 +35,10 @@ pipeline {
         stage('Generate Xray Token') {
             steps {
                 script {
-                    withCredentials([
-                        usernamePassword(credentialsId: 'xray-credentials',
-                            usernameVariable: 'XRAY_CLIENT_ID',
-                            passwordVariable: 'XRAY_CLIENT_SECRET')
-                    ]) {
+                    withCredentials([usernamePassword(credentialsId: 'xray-credentials',
+                        usernameVariable: 'XRAY_CLIENT_ID',
+                        passwordVariable: 'XRAY_CLIENT_SECRET')]) {
+
                         writeFile file: 'auth.json', text: """{
                             "client_id": "${XRAY_CLIENT_ID}",
                             "client_secret": "${XRAY_CLIENT_SECRET}"
