@@ -69,32 +69,13 @@ pipeline {
 
                         writeFile file: 'create_issue.json', text: """{
                             "fields": {
-                                "project": {
-                                    "key": "${JIRA_ISSUE_KEY}"
-                                },
+                                "project": { "key": "${JIRA_ISSUE_KEY}" },
                                 "summary": "Automated Test Case from Jenkins",
-                                "description": {
-                                    "type": "doc",
-                                    "version": 1,
-                                    "content": [
-                                        {
-                                            "type": "paragraph",
-                                            "content": [
-                                                {
-                                                    "type": "text",
-                                                    "text": "Automated test case generated from Jenkins pipeline"
-                                                }
-                                            ]
-                                        }
-                                    ]
-                                },
-                                "issuetype": {
-                                    "name": "${JIRA_ISSUE_TYPE}"
-                                }
+                                "description": { "type": "doc", "version": 1, "content": [{ "type": "paragraph", "content": [{ "type": "text", "text": "Automated test case generated from Jenkins pipeline" }] }] },
+                                "issuetype": { "name": "${JIRA_ISSUE_TYPE}" }
                             }
                         }"""
 
-                        // Create issue and store key directly
                         bat '''
                             curl -X POST ^
                             -u "%JIRA_USER%:%JIRA_AUTH_PSW%" ^
@@ -103,11 +84,12 @@ pipeline {
                             "%JIRA_URL%" > issue_response.json
                         '''
 
-                        // Parse response and extract key without storing the JSON object
-                        def issueKey = sh(script: "grep -o '\"key\":\"[^\"]*\"' issue_response.json | cut -d'\"' -f4", returnStdout: true).trim()
+                        def issueKey = bat(script: 'jq -r ".key" issue_response.json', returnStdout: true).trim()
+                        if (!issueKey) {
+                            error "No se pudo obtener el issue key de Jira"
+                        }
                         env.ISSUE_KEY = issueKey
 
-                        // Get Xray test ID
                         bat """
                             curl -H "Authorization: Bearer %XRAY_TOKEN%" ^
                             -H "Content-Type: application/json" ^
@@ -115,11 +97,12 @@ pipeline {
                             -d "{\\"query\\":\\"query { getTests(jql: \\\\\\"key = ${issueKey}\\\\\\") { results { id testType { name } } } }\\"}" > test_info.json
                         """
 
-                        // Extract test ID using grep
-                        def testId = sh(script: "grep -o '\"id\":\"[^\"]*\"' test_info.json | head -1 | cut -d'\"' -f4", returnStdout: true).trim()
+                        def testId = bat(script: 'jq -r ".data.getTests.results[0].id" test_info.json', returnStdout: true).trim()
+                        if (!testId) {
+                            error "No se pudo obtener el test ID"
+                        }
                         env.TEST_ID = testId
 
-                        // Get version ID
                         bat """
                             curl -H "Authorization: Bearer %XRAY_TOKEN%" ^
                             -H "Content-Type: application/json" ^
@@ -127,8 +110,10 @@ pipeline {
                             -d "{\\"query\\":\\"query { getTestById(id: \\\\\\"${testId}\\\\\\") { latestVersion { id } } }\\"}" > version_info.json
                         """
 
-                        // Extract version ID using grep
-                        def versionId = sh(script: "grep -o '\"id\":\"[^\"]*\"' version_info.json | head -1 | cut -d'\"' -f4", returnStdout: true).trim()
+                        def versionId = bat(script: 'jq -r ".data.getTestById.latestVersion.id" version_info.json', returnStdout: true).trim()
+                        if (!versionId) {
+                            error "No se pudo obtener el version ID"
+                        }
                         env.VERSION_ID = versionId
                     }
                 }
@@ -140,18 +125,15 @@ pipeline {
                 script {
                     def testSteps = readFile(file: 'src/main/resources/data.csv').readLines()
                     def formattedSteps = new StringBuilder("[")
-
                     testSteps.drop(1).eachWithIndex { line, index ->
                         def parts = line.split(',')
                         if (parts.length >= 3) {
                             if (index > 0) formattedSteps.append(',')
-                            formattedSteps.append("""
-                                {
-                                    "action": "${parts[0].trim()}",
-                                    "data": "${parts[1].trim()}",
-                                    "result": "${parts[2].trim()}"
-                                }
-                            """)
+                            formattedSteps.append("""{
+                                "action": "${parts[0].trim()}",
+                                "data": "${parts[1].trim()}",
+                                "result": "${parts[2].trim()}"
+                            }""")
                         }
                     }
                     formattedSteps.append("]")
