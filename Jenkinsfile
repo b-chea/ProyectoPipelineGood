@@ -40,13 +40,11 @@ pipeline {
                             usernameVariable: 'XRAY_CLIENT_ID',
                             passwordVariable: 'XRAY_CLIENT_SECRET')
                     ]) {
-                        // Create auth payload file
                         writeFile file: 'auth.json', text: """{
                             "client_id": "${XRAY_CLIENT_ID}",
                             "client_secret": "${XRAY_CLIENT_SECRET}"
                         }"""
 
-                        // Get token and save to file
                         bat '''
                             curl -X POST ^
                             -H "Content-Type: application/json" ^
@@ -68,7 +66,7 @@ pipeline {
                     withCredentials([usernamePassword(credentialsId: 'jenkins-credentials-local',
                         usernameVariable: 'JIRA_USER',
                         passwordVariable: 'JIRA_AUTH_PSW')]) {
-                        // Create Jira test issue
+
                         writeFile file: 'create_issue.json', text: """{
                             "fields": {
                                 "project": {
@@ -96,7 +94,7 @@ pipeline {
                             }
                         }"""
 
-                        // Create issue and get response
+                        // Create issue and store key directly
                         bat '''
                             curl -X POST ^
                             -u "%JIRA_USER%:%JIRA_AUTH_PSW%" ^
@@ -105,34 +103,33 @@ pipeline {
                             "%JIRA_URL%" > issue_response.json
                         '''
 
-                        // Read and parse the response
-                        def issueResponse = readFile('issue_response.json')
-                        def issueJson = new groovy.json.JsonSlurper().parseText(issueResponse)
-                        env.ISSUE_KEY = issueJson.key
+                        // Parse response and extract key without storing the JSON object
+                        def issueKey = sh(script: "grep -o '\"key\":\"[^\"]*\"' issue_response.json | cut -d'\"' -f4", returnStdout: true).trim()
+                        env.ISSUE_KEY = issueKey
 
                         // Get Xray test ID
-                        bat '''
+                        bat """
                             curl -H "Authorization: Bearer %XRAY_TOKEN%" ^
                             -H "Content-Type: application/json" ^
                             "https://us.xray.cloud.getxray.app/api/internal/10000/graphql" ^
-                            -d "{\\"query\\":\\"query { getTests(jql: \\\\\\"key = %ISSUE_KEY%\\\\\\") { results { id testType { name } } } }\\"}" > test_info.json
-                        '''
+                            -d "{\\"query\\":\\"query { getTests(jql: \\\\\\"key = ${issueKey}\\\\\\") { results { id testType { name } } } }\\"}" > test_info.json
+                        """
 
-                        def testInfo = readFile('test_info.json')
-                        def testJson = new groovy.json.JsonSlurper().parseText(testInfo)
-                        env.TEST_ID = testJson.data.getTests.results[0].id
+                        // Extract test ID using grep
+                        def testId = sh(script: "grep -o '\"id\":\"[^\"]*\"' test_info.json | head -1 | cut -d'\"' -f4", returnStdout: true).trim()
+                        env.TEST_ID = testId
 
-                        // Get latest test version
-                        bat '''
+                        // Get version ID
+                        bat """
                             curl -H "Authorization: Bearer %XRAY_TOKEN%" ^
                             -H "Content-Type: application/json" ^
                             "https://us.xray.cloud.getxray.app/api/internal/10000/graphql" ^
-                            -d "{\\"query\\":\\"query { getTestById(id: \\\\\\"${TEST_ID}\\\\\\") { latestVersion { id } } }\\"}" > version_info.json
-                        '''
+                            -d "{\\"query\\":\\"query { getTestById(id: \\\\\\"${testId}\\\\\\") { latestVersion { id } } }\\"}" > version_info.json
+                        """
 
-                        def versionInfo = readFile('version_info.json')
-                        def versionJson = new groovy.json.JsonSlurper().parseText(versionInfo)
-                        env.VERSION_ID = versionJson.data.getTestById.latestVersion.id
+                        // Extract version ID using grep
+                        def versionId = sh(script: "grep -o '\"id\":\"[^\"]*\"' version_info.json | head -1 | cut -d'\"' -f4", returnStdout: true).trim()
+                        env.VERSION_ID = versionId
                     }
                 }
             }
@@ -142,21 +139,24 @@ pipeline {
             steps {
                 script {
                     def testSteps = readFile(file: 'src/main/resources/data.csv').readLines()
-                    def formattedTestSteps = []
+                    def formattedSteps = new StringBuilder("[")
 
-                    testSteps.drop(1).each { line ->
+                    testSteps.drop(1).eachWithIndex { line, index ->
                         def parts = line.split(',')
                         if (parts.length >= 3) {
-                            def step = [
-                                action: parts[0].trim(),
-                                data: parts[1].trim(),
-                                result: parts[2].trim()
-                            ]
-                            formattedTestSteps << groovy.json.JsonOutput.toJson(step)
+                            if (index > 0) formattedSteps.append(',')
+                            formattedSteps.append("""
+                                {
+                                    "action": "${parts[0].trim()}",
+                                    "data": "${parts[1].trim()}",
+                                    "result": "${parts[2].trim()}"
+                                }
+                            """)
                         }
                     }
+                    formattedSteps.append("]")
 
-                    env.FORMATTED_TEST_STEPS = "[${formattedTestSteps.join(',')}]"
+                    env.FORMATTED_TEST_STEPS = formattedSteps.toString()
                 }
             }
         }
@@ -164,15 +164,12 @@ pipeline {
         stage('Import Test Steps') {
             steps {
                 script {
-                    def payload = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson([
-                        steps: new groovy.json.JsonSlurper().parseText(env.FORMATTED_TEST_STEPS),
-                        callTestDatasets: [],
-                        importType: "csv"
-                    ]))
+                    writeFile file: 'payload.json', text: """{
+                        "steps": ${env.FORMATTED_TEST_STEPS},
+                        "callTestDatasets": [],
+                        "importType": "csv"
+                    }"""
 
-                    writeFile file: 'payload.json', text: payload
-
-                    // Use the dynamic TEST_ID and VERSION_ID
                     bat '''
                         curl -X POST ^
                         -H "Authorization: Bearer %XRAY_TOKEN%" ^
