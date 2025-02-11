@@ -84,7 +84,15 @@ pipeline {
                             "%JIRA_URL%" > issue_response.json
                         '''
 
-                        def issueKey = bat(script: 'jq -r ".key" issue_response.json', returnStdout: true).trim()
+                        def issueKey = bat(
+                            script: '''
+                                powershell -Command "& {
+                                    $json = Get-Content issue_response.json | ConvertFrom-Json;
+                                    echo $json.key
+                                }"
+                            ''', returnStdout: true
+                        ).trim()
+
                         if (!issueKey) {
                             error "No se pudo obtener el issue key de Jira"
                         }
@@ -97,7 +105,15 @@ pipeline {
                             -d "{\\"query\\":\\"query { getTests(jql: \\\\\\"key = ${issueKey}\\\\\\") { results { id testType { name } } } }\\"}" > test_info.json
                         """
 
-                        def testId = bat(script: 'jq -r ".data.getTests.results[0].id" test_info.json', returnStdout: true).trim()
+                        def testId = bat(
+                            script: '''
+                                powershell -Command "& {
+                                    $json = Get-Content test_info.json | ConvertFrom-Json;
+                                    echo $json.data.getTests.results[0].id
+                                }"
+                            ''', returnStdout: true
+                        ).trim()
+
                         if (!testId) {
                             error "No se pudo obtener el test ID"
                         }
@@ -110,7 +126,15 @@ pipeline {
                             -d "{\\"query\\":\\"query { getTestById(id: \\\\\\"${testId}\\\\\\") { latestVersion { id } } }\\"}" > version_info.json
                         """
 
-                        def versionId = bat(script: 'jq -r ".data.getTestById.latestVersion.id" version_info.json', returnStdout: true).trim()
+                        def versionId = bat(
+                            script: '''
+                                powershell -Command "& {
+                                    $json = Get-Content version_info.json | ConvertFrom-Json;
+                                    echo $json.data.getTestById.latestVersion.id
+                                }"
+                            ''', returnStdout: true
+                        ).trim()
+
                         if (!versionId) {
                             error "No se pudo obtener el version ID"
                         }
