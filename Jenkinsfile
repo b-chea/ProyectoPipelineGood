@@ -6,6 +6,9 @@ pipeline {
         JIRA_ISSUE_TYPE = 'Bug'
         JIRA_URL = "${JIRA_SITE}/rest/api/3/issue"
         XRAY_URL = 'https://us.xray.cloud.getxray.app/api/internal/10000/test/10042/import' // URL de Xray
+
+        XRAY_CLIENT_ID = credentials('xray-client-id')
+        XRAY_CLIENT_SECRET = credentials('xray-client-secret')
     }
 
     tools {
@@ -31,6 +34,24 @@ pipeline {
                 bat 'mvn test'
             }
         }
+
+        stage('Generate Xray Token') {
+            steps {
+                script {
+                    // Generar un nuevo token JWT
+                    def tokenResponse = sh(script: """
+                curl -X POST \
+                -H "Content-Type: application/json" \
+                -d '{"client_id": "${XRAY_CLIENT_ID}", "client_secret": "${XRAY_CLIENT_SECRET}"}' \
+                "https://xray.cloud.getxray.app/api/v2/authenticate"
+            """, returnStdout: true).trim()
+
+                    // Extraer el token de la respuesta
+                    env.XRAY_TOKEN = tokenResponse.replaceAll('"', '')
+                }
+            }
+        }
+
 
 
 
@@ -79,7 +100,7 @@ pipeline {
                         // Enviar la solicitud a la API de Xray usando el archivo temporal
                         bat """
                         curl -X POST ^
-                        -H "Authorization: ${authHeader}" ^
+                        -H "Authorization: Bearer ${env.XRAY_TOKEN}" ^
                         -H "Content-Type: application/json" ^
                         -H "Accept: application/json, text/plain, */*" ^
                         -H "Accept-Language: es-419,es;q=0.9,es-ES;q=0.8,en;q=0.7,en-GB;q=0.6,en-US;q=0.5" ^
@@ -90,7 +111,7 @@ pipeline {
                         -H "Sec-Fetch-Mode: cors" ^
                         -H "Sec-Fetch-Site: same-origin" ^
                         -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36 Edg/132.0.0.0" ^
-                        -H "X-acpt: eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI3MTIwMjA6MzllOWU0YjctNGEwZS00ODU4LWFhMzUtNDcxMzIyNjA0ZTFkIiwicXNoIjoiY29udGV4dC1xc2giLCJpc3MiOiI1NTI4YTAzNy0wZDE1LTNlNTMtYTAzMy02NmQ1YzFlODQxM2MiLCJjb250ZXh0Ijp7ImxpY2Vuc2UiOnsiYWN0aXZlIjp0cnVlfSwidXJsIjp7ImRpc3BsYXlVcmwiOiJodHRwczpcL1wvYmV0aHNhaWRhY2gtMTczODY5NDAyMjc1Ni5hdGxhc3NpYW4ubmV0IiwiZGlzcGxheVVybFNlcnZpY2VkZXNrSGVscENlbnRlciI6Imh0dHBzOlwvXC9iZXRoc2FpZGFjaC0xNzM4Njk0MDIyNzU2LmF0bGFzc2lhbi5uZXQifSwiamlyYSI6eyJpc3N1ZSI6eyJpc3N1ZXR5cGUiOnsiaWQiOiIxMDAxNiJ9LCJrZXkiOiJQTFBST0pFQ1QxLTM4IiwiaWQiOiIxMDA0MiJ9LCJwcm9qZWN0Ijp7ImtleSI6IlBMUFJPSkVDVDEiLCJpZCI6IjEwMDAwIn19fSwiZXhwIjoxNzM5MjA4MTE1LCJpYXQiOjE3MzkyMDcyMTV9.Z82vU8qthgKkYu4RitWMwpfDLjtAIKtFqfnxvVOSbxg" ^
+                        -H "X-acpt: ${env.XRAY_TOKEN}" ^
                         -H "sec-ch-ua: \\"Not A(Brand\\";v=\\"8\\", \\"Chromium\\";v=\\"132\\", \\"Microsoft Edge\\";v=\\"132\\"" ^
                         -H "sec-ch-ua-mobile: ?0" ^
                         -H "sec-ch-ua-platform: \\"Windows\\"" ^
