@@ -3,7 +3,7 @@ pipeline {
     environment {
         JIRA_SITE = 'https://bethsaidach-1738694022756.atlassian.net'
         JIRA_ISSUE_KEY = 'PLPROJECT1'
-        JIRA_ISSUE_TYPE = 'Bug'
+        JIRA_ISSUE_TYPE = 'Test'
         JIRA_URL = "${JIRA_SITE}/rest/api/3/issue"
         XRAY_URL = 'https://us.xray.cloud.getxray.app/api/internal/10000/test/10042/import' // URL de Xray
 
