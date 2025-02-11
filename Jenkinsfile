@@ -68,73 +68,68 @@ pipeline {
                         passwordVariable: 'JIRA_AUTH_PSW')]) {
 
                         writeFile file: 'create_issue.json', text: """{
-                    "fields": {
-                        "project": {
-                            "key": "${JIRA_ISSUE_KEY}"
-                        },
-                        "summary": "Automated Test Case from Jenkins",
-                        "description": {
-                            "type": "doc",
-                            "version": 1,
-                            "content": [
-                                {
-                                    "type": "paragraph",
+                            "fields": {
+                                "project": {
+                                    "key": "${JIRA_ISSUE_KEY}"
+                                },
+                                "summary": "Automated Test Case from Jenkins",
+                                "description": {
+                                    "type": "doc",
+                                    "version": 1,
                                     "content": [
                                         {
-                                            "type": "text",
-                                            "text": "Automated test case generated from Jenkins pipeline"
+                                            "type": "paragraph",
+                                            "content": [
+                                                {
+                                                    "type": "text",
+                                                    "text": "Automated test case generated from Jenkins pipeline"
+                                                }
+                                            ]
                                         }
                                     ]
+                                },
+                                "issuetype": {
+                                    "name": "${JIRA_ISSUE_TYPE}"
                                 }
-                            ]
-                        },
-                        "issuetype": {
-                            "name": "${JIRA_ISSUE_TYPE}"
-                        }
-                    }
-                }"""
+                            }
+                        }"""
 
-                        // Create issue
+                        // Create issue and store key directly
                         bat '''
-                    curl -X POST ^
-                    -u "%JIRA_USER%:%JIRA_AUTH_PSW%" ^
-                    -H "Content-Type: application/json" ^
-                    -d @create_issue.json ^
-                    "%JIRA_URL%" > issue_response.json
-                '''
+                            curl -X POST ^
+                            -u "%JIRA_USER%:%JIRA_AUTH_PSW%" ^
+                            -H "Content-Type: application/json" ^
+                            -d @create_issue.json ^
+                            "%JIRA_URL%" > issue_response.json
+                        '''
 
-                        // For Windows, using PowerShell to extract the key
-                        def issueKey = bat(script: '@powershell -Command "Get-Content issue_response.json | ConvertFrom-Json | Select-Object -ExpandProperty key"', returnStdout: true).trim()
+                        // Parse response and extract key without storing the JSON object
+                        def issueKey = sh(script: "grep -o '\"key\":\"[^\"]*\"' issue_response.json | cut -d'\"' -f4", returnStdout: true).trim()
                         env.ISSUE_KEY = issueKey
 
-                        // Get Xray test ID using the extracted issue key
+                        // Get Xray test ID
                         bat """
-                    curl -H "Authorization: Bearer %XRAY_TOKEN%" ^
-                    -H "Content-Type: application/json" ^
-                    "https://us.xray.cloud.getxray.app/api/internal/10000/graphql" ^
-                    -d "{\\"query\\":\\"query { getTests(jql: \\\\\\"key = ${issueKey}\\\\\\") { results { id testType { name } } } }\\"}" > test_info.json
-                """
+                            curl -H "Authorization: Bearer %XRAY_TOKEN%" ^
+                            -H "Content-Type: application/json" ^
+                            "https://us.xray.cloud.getxray.app/api/internal/10000/graphql" ^
+                            -d "{\\"query\\":\\"query { getTests(jql: \\\\\\"key = ${issueKey}\\\\\\") { results { id testType { name } } } }\\"}" > test_info.json
+                        """
 
-                        // Extract test ID using PowerShell
-                        def testId = bat(script: '@powershell -Command "Get-Content test_info.json | ConvertFrom-Json | Select-Object -ExpandProperty data | Select-Object -ExpandProperty getTests | Select-Object -ExpandProperty results | Select-Object -First 1 | Select-Object -ExpandProperty id"', returnStdout: true).trim()
+                        // Extract test ID using grep
+                        def testId = sh(script: "grep -o '\"id\":\"[^\"]*\"' test_info.json | head -1 | cut -d'\"' -f4", returnStdout: true).trim()
                         env.TEST_ID = testId
 
-                        // Get version ID using the extracted test ID
+                        // Get version ID
                         bat """
-                    curl -H "Authorization: Bearer %XRAY_TOKEN%" ^
-                    -H "Content-Type: application/json" ^
-                    "https://us.xray.cloud.getxray.app/api/internal/10000/graphql" ^
-                    -d "{\\"query\\":\\"query { getTestById(id: \\\\\\"${testId}\\\\\\") { latestVersion { id } } }\\"}" > version_info.json
-                """
+                            curl -H "Authorization: Bearer %XRAY_TOKEN%" ^
+                            -H "Content-Type: application/json" ^
+                            "https://us.xray.cloud.getxray.app/api/internal/10000/graphql" ^
+                            -d "{\\"query\\":\\"query { getTestById(id: \\\\\\"${testId}\\\\\\") { latestVersion { id } } }\\"}" > version_info.json
+                        """
 
-                        // Extract version ID using PowerShell
-                        def versionId = bat(script: '@powershell -Command "Get-Content version_info.json | ConvertFrom-Json | Select-Object -ExpandProperty data | Select-Object -ExpandProperty getTestById | Select-Object -ExpandProperty latestVersion | Select-Object -ExpandProperty id"', returnStdout: true).trim()
+                        // Extract version ID using grep
+                        def versionId = sh(script: "grep -o '\"id\":\"[^\"]*\"' version_info.json | head -1 | cut -d'\"' -f4", returnStdout: true).trim()
                         env.VERSION_ID = versionId
-
-                        // Debug output
-                        echo "Issue Key: ${env.ISSUE_KEY}"
-                        echo "Test ID: ${env.TEST_ID}"
-                        echo "Version ID: ${env.VERSION_ID}"
                     }
                 }
             }
