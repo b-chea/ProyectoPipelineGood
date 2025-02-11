@@ -6,8 +6,6 @@ pipeline {
         JIRA_ISSUE_TYPE = 'Bug'
         JIRA_URL = "${JIRA_SITE}/rest/api/3/issue"
         XRAY_URL = 'https://us.xray.cloud.getxray.app/api/internal/10000/test/10042/import'
-        // Using credentials() binding for sensitive data
-        XRAY_CREDENTIALS = credentials('xray-credentials')
     }
 
     tools {
@@ -36,24 +34,34 @@ pipeline {
 
         stage('Generate Xray Token') {
             steps {
-                script {
-                    // Using a more secure way to handle credentials
-                    withCredentials([usernamePassword(credentialsId: 'xray-credentials',
+                withCredentials([
+                    usernamePassword(credentialsId: 'xray-credentials',
                         usernameVariable: 'XRAY_CLIENT_ID',
-                        passwordVariable: 'XRAY_CLIENT_SECRET')]) {
-                        // Create authentication payload
-                        def authPayload = """{"client_id": "${XRAY_CLIENT_ID}", "client_secret": "${XRAY_CLIENT_SECRET}"}"""
+                        passwordVariable: 'XRAY_CLIENT_SECRET')
+                ]) {
+                    script {
+                        // Write credentials to a temporary file to avoid command line exposure
+                        writeFile file: 'auth.json', text: """{
+                            "client_id": "${XRAY_CLIENT_ID}",
+                            "client_secret": "${XRAY_CLIENT_SECRET}"
+                        }"""
 
-                        // Get authentication token
-                        def response = bat(script: """
-                            curl -X POST ^
-                            -H "Content-Type: application/json" ^
-                            -d "${authPayload}" ^
-                            "https://xray.cloud.getxray.app/api/v2/authenticate"
-                        """, returnStdout: true).trim()
+                        // Get authentication token using file
+                        def response = bat(
+                            script: '''
+                                curl -X POST ^
+                                -H "Content-Type: application/json" ^
+                                -d @auth.json ^
+                                https://xray.cloud.getxray.app/api/v2/authenticate
+                            ''',
+                            returnStdout: true
+                        ).trim()
 
-                        // Store token securely
-                        env.XRAY_TOKEN = response.replaceAll('"', '')
+                        // Clean up auth file immediately
+                        bat 'del auth.json'
+
+                        // Store token, removing quotes and any whitespace
+                        env.XRAY_TOKEN = response.replaceAll('["\\s]', '')
                     }
                 }
             }
@@ -84,32 +92,30 @@ pipeline {
 
         stage('Create Test Jira Issue with Steps') {
             steps {
-                script {
-                    withCredentials([usernamePassword(credentialsId: 'jenkins-credentials-local',
+                withCredentials([
+                    usernamePassword(credentialsId: 'jenkins-credentials-local',
                         usernameVariable: 'JIRA_USER',
-                        passwordVariable: 'JIRA_AUTH_PSW')]) {
-                        // Create temporary file with proper JSON escaping
-                        def jsonPayload = groovy.json.JsonOutput.toJson([
+                        passwordVariable: 'JIRA_AUTH_PSW')
+                ]) {
+                    script {
+                        // Create payload file with proper JSON formatting
+                        def payload = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson([
                             steps: new groovy.json.JsonSlurper().parseText(env.FORMATTED_TEST_STEPS),
                             callTestDatasets: [],
                             importType: "csv"
-                        ])
+                        ]))
 
-                        writeFile(file: 'temp_payload.json', text: jsonPayload)
+                        writeFile file: 'payload.json', text: payload
 
-                        // Use powershell instead of bat for better handling of special characters
-                        powershell """
-                            \$headers = @{
-                                'Authorization' = 'Bearer ${env.XRAY_TOKEN}'
-                                'Content-Type' = 'application/json'
-                                'Accept' = 'application/json, text/plain, */*'
-                            }
-
-                            \$uri = '${XRAY_URL}?testVersionId=67a9f5d200cff4d61001bdd2&resetSteps=false'
-                            \$payload = Get-Content 'temp_payload.json' -Raw
-
-                            Invoke-RestMethod -Uri \$uri -Method Post -Headers \$headers -Body \$payload
-                        """
+                        // Use bat with a heredoc-style command to avoid escaping issues
+                        bat '''
+                            curl -X POST ^
+                            -H "Authorization: Bearer %XRAY_TOKEN%" ^
+                            -H "Content-Type: application/json" ^
+                            -H "Accept: application/json" ^
+                            "%XRAY_URL%?testVersionId=67a9f5d200cff4d61001bdd2&resetSteps=false" ^
+                            -d @payload.json
+                        '''
                     }
                 }
             }
@@ -118,8 +124,8 @@ pipeline {
 
     post {
         always {
-            // Clean up temporary files
-            cleanWs(patterns: [[pattern: 'temp_payload.json', type: 'INCLUDE']])
+            // Clean up any temporary files
+            bat 'del payload.json'
         }
         success {
             echo 'Successfully created Jira issue with test steps!'
