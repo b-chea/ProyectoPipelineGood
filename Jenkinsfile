@@ -32,32 +32,7 @@ pipeline {
             }
         }
 
-        stage('Generate Xray Token') {
-            steps {
-                script {
-                    withCredentials([usernamePassword(credentialsId: 'xray-credentials',
-                        usernameVariable: 'XRAY_CLIENT_ID',
-                        passwordVariable: 'XRAY_CLIENT_SECRET')]) {
 
-                        writeFile file: 'auth.json', text: """{
-                            \"client_id\": \"${XRAY_CLIENT_ID}\",
-                            \"client_secret\": \"${XRAY_CLIENT_SECRET}\"
-                        }"""
-
-                        bat '''
-                            curl -X POST ^
-                            -H "Content-Type: application/json" ^
-                            -d @auth.json ^
-                            https://xray.cloud.getxray.app/api/v2/authenticate > _id.txt
-                        '''
-
-                        def _id = readFile('_id.txt').trim().replaceAll('"', '')
-                        bat 'del auth.json token.txt'
-                        env.XRAY_TOKEN = _id
-                    }
-                }
-            }
-        }
 
         stage('Create Jira Test Issue') {
             steps {
@@ -92,10 +67,22 @@ pipeline {
                             error "No se pudo obtener el issue key de Jira"
                         }
                         env.TEST_ID = issueId
+
+                        def testVersionId = powershell(script: '''
+                            $json = Get-Content issue_response.json -Raw | ConvertFrom-Json;
+                            echo $json.testVersionId
+                        ''', returnStdout: true).trim()
+
+                        if (!testVersionId) {
+                            error "No se pudo obtener el issue key de Jira"
+                        }
+                        env.XRAY_TOKEN = testVersionId
                     }
                 }
             }
         }
+
+
 
         stage('Prepare CSV Test Steps') {
             steps {
