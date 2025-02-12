@@ -48,12 +48,15 @@ pipeline {
                             curl -X POST ^
                             -H "Content-Type: application/json" ^
                             -d @auth.json ^
-                            https://xray.cloud.getxray.app/api/v2/authenticate > token.txt
+                            https://xray.cloud.getxray.app/api/v2/authenticate > token_response.json
                         '''
 
-                        def token = readFile('token.txt').trim().replaceAll('"', '')
-                        bat 'del auth.json token.txt'
-                        env.XRAY_TOKEN = token
+                        def tokenJson = readFile('token_response.json').trim()
+                        def json = readJSON text: tokenJson
+                        def xrayId = json._id // Extraer _id en lugar del token
+
+                        bat 'del auth.json token_response.json'
+                        env.XRAY_ID = xrayId
                     }
                 }
             }
@@ -83,15 +86,14 @@ pipeline {
                             "%JIRA_URL%" > issue_response.json
                         '''
 
-                        def issueKey = powershell(script: '''
-                            $json = Get-Content issue_response.json -Raw | ConvertFrom-Json;
-                            echo $json.key
-                        ''', returnStdout: true).trim()
+                        def issueJson = readFile('issue_response.json').trim()
+                        def issueData = readJSON text: issueJson
+                        def issueId = issueData.id // Extraer issueId en lugar de issueKey
 
-                        if (!issueKey) {
-                            error "No se pudo obtener el issue key de Jira"
+                        if (!issueId) {
+                            error "No se pudo obtener el issue ID de Jira"
                         }
-                        env.TEST_ID = issueKey
+                        env.TEST_ID = issueId
                     }
                 }
             }
@@ -130,15 +132,15 @@ pipeline {
                     }"""
 
                     echo "Test ID: ${env.TEST_ID}"
-                    echo "Xray Token: ${env.XRAY_TOKEN}"
+                    echo "Xray ID: ${env.XRAY_ID}"
                     bat 'type payload.json'
 
                     bat '''
                         curl -X POST ^
-                        -H "Authorization: Bearer %XRAY_TOKEN%" ^
+                        -H "Authorization: Bearer %XRAY_ID%" ^
                         -H "Content-Type: application/json" ^
                         -H "Accept: application/json" ^
-                        "https://us.xray.cloud.getxray.app/api/internal/10000/test/%TEST_ID%/import?testVersionId=%XRAY_TOKEN%&resetSteps=false" ^
+                        "https://us.xray.cloud.getxray.app/api/internal/10000/test/%TEST_ID%/import?testVersionId=%XRAY_ID%&resetSteps=false" ^
                         -d @payload.json
                     '''
                 }
