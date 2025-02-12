@@ -51,9 +51,19 @@ pipeline {
                             https://xray.cloud.getxray.app/api/v2/authenticate > token.txt
                         '''
 
-                        def token = readFile('token.txt').trim().replaceAll('"', '')
-                        bat 'del auth.json token.txt'
-                        env.XRAY_TOKEN = token
+                        bat '''
+                            curl -X POST ^
+                            -H "Content-Type: application/json" ^
+                            -d @auth.json ^
+                            https://xray.cloud.getxray.app/api/v2/authenticate > token_response.json
+                        '''
+
+                        def tokenJson = readFile('token_response.json').trim()
+                        def json = readJSON text: tokenJson
+                        def xrayId = json._id // Extraer _id en lugar del token
+
+                        bat 'del auth.json token_response.json'
+                        env.XRAY_TOKEN = xrayId
                     }
                 }
             }
