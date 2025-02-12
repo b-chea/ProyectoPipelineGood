@@ -83,15 +83,15 @@ pipeline {
                             "%JIRA_URL%" > issue_response.json
                         '''
 
-                        def issueId = powershell(script: '''
+                        def testIssueId = powershell(script: '''
                             $json = Get-Content issue_response.json -Raw | ConvertFrom-Json;
                             echo $json.key
                         ''', returnStdout: true).trim()
 
-                        if (!issueId) {
+                        if (!testIssueId) {
                             error "No se pudo obtener el issue key de Jira"
                         }
-                        env.TEST_ID = issueId
+                        env.TEST_ID = testIssueId
                     }
                 }
             }
