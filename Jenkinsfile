@@ -83,15 +83,15 @@ pipeline {
                             "%JIRA_URL%" > issue_response.json
                         '''
 
-                        def testIssueId = powershell(script: '''
+                        def issueKey = powershell(script: '''
                             $json = Get-Content issue_response.json -Raw | ConvertFrom-Json;
                             echo $json.key
                         ''', returnStdout: true).trim()
 
-                        if (!testIssueId) {
+                        if (!issueKey) {
                             error "No se pudo obtener el issue key de Jira"
                         }
-                        env.TEST_ID = testIssueId
+                        env.TEST_ID = issueKey
                     }
                 }
             }
@@ -138,7 +138,7 @@ pipeline {
                         -H "Authorization: Bearer %XRAY_TOKEN%" ^
                         -H "Content-Type: application/json" ^
                         -H "Accept: application/json" ^
-                        "https://us.xray.cloud.getxray.app/api/internal/10000/test/%TEST_ID%/import?resetSteps=false" ^
+                        "https://us.xray.cloud.getxray.app/api/internal/10000/test/%TEST_ID%/import?testVersionId=%XRAY_TOKEN%&resetSteps=false" ^
                         -d @payload.json
                     '''
                 }
