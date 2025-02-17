@@ -6,7 +6,6 @@ pipeline {
         JIRA_ISSUE_TYPE = 'Test'
         JIRA_URL = "${JIRA_SITE}/rest/api/3/issue"
         XRAY_BASE_URL = 'https://us.xray.cloud.getxray.app/api/internal/10000/test'
-        LANG = 'en_US.UTF-8'
     }
 
     tools {
@@ -15,31 +14,6 @@ pipeline {
     }
 
     stages {
-        stage('Authenticate Xray') {
-            steps {
-                script {
-                    withCredentials([string(credentialsId: 'xray-api-token', variable: 'XRAY_AUTH')]) {
-                        def xrayResponse = bat(script: '''
-                            curl -X POST ^
-                            -H "Content-Type: application/json" ^
-                            -d "{\\"client_id\\": \\"YOUR_CLIENT_ID\\", \\"client_secret\\": \\"%XRAY_AUTH%\\"}" ^
-                            "https://xray.cloud.getxray.app/api/v2/authenticate" > xray_token.json
-                        ''', returnStdout: true).trim()
-
-                        def xrayToken = powershell(script: '''
-                            $json = Get-Content xray_token.json -Raw | ConvertFrom-Json
-                            echo $json
-                        ''', returnStdout: true).trim()
-
-                        if (!xrayToken) {
-                            error "❌ ERROR: No se pudo autenticar con Xray."
-                        }
-                        env.XRAY_TOKEN = xrayToken
-                    }
-                }
-            }
-        }
-
         stage('Build') {
             steps {
                 echo "Building..."
@@ -57,6 +31,8 @@ pipeline {
                 bat 'mvn test'
             }
         }
+
+
 
         stage('Create Jira Test Issue') {
             steps {
@@ -83,12 +59,12 @@ pipeline {
                         '''
 
                         def issueId = powershell(script: '''
-                            $json = Get-Content issue_response.json -Raw | ConvertFrom-Json
+                            $json = Get-Content issue_response.json -Raw | ConvertFrom-Json;
                             echo $json.id
                         ''', returnStdout: true).trim()
 
                         if (!issueId) {
-                            error "❌ ERROR: No se pudo obtener el issue key de Jira"
+                            error "No se pudo obtener el issue key de Jira"
                         }
                         env.TEST_ID = issueId
                     }
@@ -96,35 +72,29 @@ pipeline {
             }
         }
 
-        stage('Get Test Version ID') {
+        stage('Generate Xray Token') {
             steps {
                 script {
-                    bat '''
-                        curl -X GET ^
-                        -H "Authorization: Bearer %XRAY_TOKEN%" ^
-                        -H "Content-Type: application/json" ^
-                        "%XRAY_BASE_URL%/%TEST_ID%" > test_info.json
-                    '''
+                    withCredentials([usernamePassword(credentialsId: 'xray-credentials',
+                        usernameVariable: 'XRAY_CLIENT_ID',
+                        passwordVariable: 'XRAY_CLIENT_SECRET')]) {
 
-                    def testInfoContent = readFile('test_info.json').trim()
-                    if (!testInfoContent || testInfoContent == "") {
-                        error "❌ ERROR: test_info.json está vacío."
+                        writeFile file: 'auth.json', text: """{
+                            \"client_id\": \"${XRAY_CLIENT_ID}\",
+                            \"client_secret\": \"${XRAY_CLIENT_SECRET}\"
+                        }"""
+
+                        bat '''
+                            curl -X POST ^
+                            -H "Content-Type: application/json" ^
+                            -d @auth.json ^
+                            https://xray.cloud.getxray.app/api/v2/authenticate > token.txt
+                        '''
+
+                        def token = readFile('token.txt').trim().replaceAll('"', '')
+                        bat 'del auth.json token.txt'
+                        env.XRAY_TOKEN = token
                     }
-
-                    def testVersionId = powershell(script: '''
-                        try {
-                            $json = Get-Content test_info.json -Raw | ConvertFrom-Json
-                            echo $json.testVersionId
-                        } catch {
-                            Write-Host "❌ ERROR: test_info.json no es un JSON válido."
-                            exit 1
-                        }
-                    ''', returnStdout: true).trim()
-
-                    if (!testVersionId) {
-                        error "❌ ERROR: No se pudo obtener el testVersionId"
-                    }
-                    env.TEST_VERSION_ID = testVersionId
                 }
             }
         }
@@ -132,9 +102,7 @@ pipeline {
         stage('Prepare CSV Test Steps') {
             steps {
                 script {
-                    def testStepsContent = readFile('src/main/resources/data.csv').trim()
-                    def testSteps = testStepsContent.split("\n")
-
+                    def testSteps = readFile(file: 'src/main/resources/data.csv').readLines()
                     def formattedSteps = testSteps.drop(1).collect { line ->
                         def parts = line.split(',')
                         if (parts.length >= 3) {
@@ -145,7 +113,6 @@ pipeline {
                             }"""
                         }
                     }.join(',')
-
                     env.FORMATTED_TEST_STEPS = "[${formattedSteps}]"
                 }
             }
@@ -154,8 +121,8 @@ pipeline {
         stage('Import Test Steps') {
             steps {
                 script {
-                    if (!env.TEST_ID || !env.TEST_VERSION_ID) {
-                        error "❌ ERROR: TEST_ID o TEST_VERSION_ID no están definidos"
+                    if (!env.TEST_ID) {
+                        error "TEST_ID no está definido"
                     }
 
                     writeFile file: 'payload.json', text: """{
@@ -164,12 +131,16 @@ pipeline {
                         \"importType\": \"csv\"
                     }"""
 
+                    echo "Test ID: ${env.TEST_ID}"
+                    echo "Xray Token: ${env.XRAY_TOKEN}"
+                    bat 'type payload.json'
+
                     bat '''
                         curl -X POST ^
                         -H "Authorization: Bearer %XRAY_TOKEN%" ^
                         -H "Content-Type: application/json" ^
                         -H "Accept: application/json" ^
-                        "%XRAY_BASE_URL%/%TEST_ID%/import?testVersionId=%TEST_VERSION_ID%&resetSteps=false" ^
+                        "https://us.xray.cloud.getxray.app/api/internal/10000/test/%TEST_ID%/import?testVersionId=%XRAY_TOKEN%&resetSteps=false" ^
                         -d @payload.json
                     '''
                 }
@@ -179,13 +150,15 @@ pipeline {
 
     post {
         always {
-            bat 'del /F /Q payload.json create_issue.json issue_response.json test_info.json xray_token.json'
+            bat '''
+                del /F /Q payload.json create_issue.json issue_response.json
+            '''
         }
         success {
-            echo '✅ Successfully created Jira test issue and imported steps!'
+            echo 'Successfully created Jira test issue and imported steps!'
         }
         failure {
-            echo '❌ Build failed!'
+            echo 'Build failed!'
         }
     }
 }
