@@ -67,21 +67,48 @@ pipeline {
                             error "No se pudo obtener el issue key de Jira"
                         }
                         env.TEST_ID = issueId
-
-                        def testVersionId = powershell(script: '''
-                            $json = Get-Content issue_response.json -Raw | ConvertFrom-Json;
-                            echo $json.testVersionId
-                        ''', returnStdout: true).trim()
-
-                        if (!testVersionId) {
-                            error "No se pudo obtener el issue key de Jira"
-                        }
-                        env.XRAY_TOKEN = testVersionId
                     }
                 }
             }
         }
 
+        stage('Obtener testVersionId') {
+            steps {
+                script {
+                    withCredentials([usernamePassword(credentialsId: 'xray-credentials',
+                        usernameVariable: 'XRAY_CLIENT_ID',
+                        passwordVariable: 'XRAY_CLIENT_SECRET')]) {
+
+                        writeFile file: 'auth.json', text: """{
+                    \"client_id\": \"${XRAY_CLIENT_ID}\",
+                    \"client_secret\": \"${XRAY_CLIENT_SECRET}\"
+                }"""
+
+                        // Autenticación para obtener el token
+                        bat '''
+                    curl -X POST ^
+                    -H "Content-Type: application/json" ^
+                    -d @auth.json ^
+                    https://xray.cloud.getxray.app/api/v2/authenticate > token.txt
+                '''
+
+                        def token = readFile('token.txt').trim().replaceAll('"', '')
+
+                        // Obtener testVersionId usando el token
+                        bat '''
+                    curl -X GET ^
+                    -H "Content-Type: application/json" ^
+                    -H "Authorization: Bearer ${token}" ^
+                    https://xray.cloud.getxray.app/api/v2/testversion > testVersionId.txt
+                '''
+
+                        def testVersionId = readFile('testVersionId.txt').trim().replaceAll('"', '')
+                        bat 'del auth.json token.txt testVersionId.txt'
+                        env.TEST_VERSION_ID = testVersionId
+                    }
+                }
+            }
+        }
 
 
         stage('Prepare CSV Test Steps') {
@@ -125,7 +152,7 @@ pipeline {
                         -H "Authorization: Bearer %XRAY_TOKEN%" ^
                         -H "Content-Type: application/json" ^
                         -H "Accept: application/json" ^
-                        "https://us.xray.cloud.getxray.app/api/internal/10000/test/%TEST_ID%/import?testVersionId=%XRAY_TOKEN%&resetSteps=false" ^
+                        "https://us.xray.cloud.getxray.app/api/internal/10000/test/%TEST_ID%/import?testVersionId=%TEST_VERSION_ID%&resetSteps=false" ^
                         -d @payload.json
                     '''
                 }
