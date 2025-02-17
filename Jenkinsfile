@@ -63,20 +63,12 @@ pipeline {
                             echo $json.id
                         ''', returnStdout: true).trim()
 
-
-                        def testVersionId = powershell(script: '''
-                        $json = Get-Content issue_response.json -Raw | ConvertFrom-Json;
-                        echo $json.fields.customfield_testVersionId
-                    ''', returnStdout: true).trim()  // Ajusta esto según la estructura exacta del JSON
-
                         if (!issueId) {
                             error "No se pudo obtener el issue key de Jira"
                         }
-                        if (!testVersionId) {
-                            error "No se pudo obtener el testVersionId"
-                        }
                         env.TEST_ID = issueId
-                        env.TEST_VERSION_ID = testVersionId
+
+
                     }
                 }
             }
@@ -105,6 +97,30 @@ pipeline {
                         bat 'del auth.json token.txt'
                         env.XRAY_TOKEN = token
                     }
+                }
+            }
+        }
+        stage('Get Test Version ID') {
+            steps {
+                script {
+                    def issueDetails = bat(script: """
+                curl -X GET ^
+                -H "Authorization: Bearer %XRAY_TOKEN%" ^
+                -H "Accept: application/json" ^
+                "%JIRA_URL%/${env.TEST_ID}" ^
+                -o issue_details.json
+            """, returnStdout: true).trim()
+
+                    // Leer el testVersionId desde la respuesta
+                    def testVersionId = powershell(script: '''
+                $json = Get-Content issue_details.json -Raw | ConvertFrom-Json;
+                echo $json.fields.customfield_testVersionId
+            ''', returnStdout: true).trim()
+
+                    if (!testVersionId) {
+                        error "No se pudo obtener el testVersionId"
+                    }
+                    env.TEST_VERSION_ID = testVersionId
                 }
             }
         }
@@ -143,6 +159,7 @@ pipeline {
 
                     echo "Test ID: ${env.TEST_ID}"
                     echo "Xray Token: ${env.XRAY_TOKEN}"
+                    echo "Test Version Id: ${env.TEST_VERSION_ID}"
                     bat 'type payload.json'
 
                     bat '''
