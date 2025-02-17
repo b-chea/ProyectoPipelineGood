@@ -149,7 +149,7 @@ pipeline {
 
                     bat '''
                         curl -X POST ^
-                        -H "Authorization: Bearer %XRAY_TOKEN%" ^
+                        -H "Authorization: Bearer %TEST_VERSION_ID%" ^
                         -H "Content-Type: application/json" ^
                         -H "Accept: application/json" ^
                         "https://us.xray.cloud.getxray.app/api/internal/10000/test/%TEST_ID%/import?testVersionId=%TEST_VERSION_ID%&resetSteps=false" ^
