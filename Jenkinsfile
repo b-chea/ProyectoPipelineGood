@@ -6,6 +6,7 @@ pipeline {
         JIRA_ISSUE_TYPE = 'Test'
         JIRA_URL = "${JIRA_SITE}/rest/api/3/issue"
         XRAY_BASE_URL = 'https://us.xray.cloud.getxray.app/api/internal/10000/test'
+        LANG = 'en_US.UTF-8'
     }
 
     tools {
