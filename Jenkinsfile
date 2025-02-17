@@ -144,7 +144,7 @@ pipeline {
                     }"""
 
                     echo "Test ID: ${env.TEST_ID}"
-                    echo "Xray Token: ${env.XRAY_TOKEN}"
+                    echo "Xray Token: ${env.TEST_VERSION_ID}"
                     bat 'type payload.json'
 
                     bat '''
