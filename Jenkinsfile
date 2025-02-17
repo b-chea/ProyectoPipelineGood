@@ -75,26 +75,51 @@ pipeline {
         stage('Get Test Version ID') {
             steps {
                 script {
+                    // Llamada a la API de Xray para obtener la información del test
                     bat '''
-                        curl -X GET ^
-                        -H "Authorization: Bearer %XRAY_TOKEN%" ^
-                        -H "Content-Type: application/json" ^
-                        "https://us.xray.cloud.getxray.app/api/internal/10000/test/%TEST_ID%" > test_info.json
-                    '''
+                curl -X GET ^
+                -H "Authorization: Bearer %XRAY_TOKEN%" ^
+                -H "Content-Type: application/json" ^
+                "https://us.xray.cloud.getxray.app/api/internal/10000/test/%TEST_ID%" > test_info.json
+            '''
 
-                    def testInfo = readFile('test_info.json').trim()
-                    def testVersionId = powershell(script: '''
-                        $json = Get-Content test_info.json -Raw | ConvertFrom-Json;
-                        echo $json.testVersionId
-                    ''', returnStdout: true).trim()
+                    // 📜 Muestra el contenido del JSON antes de procesarlo
+                    bat 'type test_info.json'
 
-                    if (!testVersionId) {
-                        error "No se pudo obtener el testVersionId"
+                    // 🔍 Verifica si el archivo JSON está vacío
+                    def testInfoContent = readFile('test_info.json').trim()
+                    if (!testInfoContent || testInfoContent == "") {
+                        error "❌ ERROR: test_info.json está vacío. La API de Xray no devolvió datos."
                     }
+
+                    // 🚨 Manejo de errores en PowerShell antes de usar ConvertFrom-Json
+                    def testVersionId = powershell(script: '''
+                $jsonContent = Get-Content test_info.json -Raw
+                if (-not $jsonContent -or $jsonContent -eq "") {
+                    Write-Host "❌ ERROR: test_info.json está vacío o no se pudo leer."
+                    exit 1
+                }
+
+                try {
+                    $json = $jsonContent | ConvertFrom-Json
+                    echo $json.testVersionId
+                } catch {
+                    Write-Host "❌ ERROR: No se pudo convertir test_info.json a JSON válido."
+                    exit 1
+                }
+            ''', returnStdout: true).trim()
+
+                    // ❌ Si no se obtiene un testVersionId, detenemos la ejecución con error
+                    if (!testVersionId) {
+                        error "❌ No se pudo obtener testVersionId. Verifica test_info.json."
+                    }
+
+                    // Guardamos el Test Version ID en una variable de entorno
                     env.TEST_VERSION_ID = testVersionId
                 }
             }
         }
+
 
         stage('Prepare CSV Test Steps') {
             steps {
